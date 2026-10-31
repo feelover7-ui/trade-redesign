@@ -1,0 +1,15 @@
+import {resolve} from 'node:path';
+import {openDatabase} from './db.mjs';
+import {createApp} from './app.mjs';
+import {seedDemo} from './seed.mjs';
+const dataDir=resolve(process.env.DATA_DIR||'./data');
+const origin=process.env.APP_ORIGIN||'http://localhost:4310';
+const demo=process.env.DEMO_MODE==='true';
+if(demo&&process.env.NODE_ENV==='production')throw new Error('운영 환경에서 데모 계정을 사용할 수 없습니다.');
+if(!/^https:\/\//.test(origin)&&!/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))throw new Error('외부 접속용 APP_ORIGIN은 HTTPS여야 합니다.');
+if(origin.startsWith('https://')&&process.env.SECURE_COOKIE!=='true')throw new Error('HTTPS 배포에는 SECURE_COOKIE=true가 필요합니다.');
+const db=openDatabase(resolve(dataDir,'trade.sqlite'));
+if(demo)await seedDemo(db,dataDir);
+const host=process.env.HOST||'127.0.0.1',port=Number(process.env.PORT||4310);
+const server=createApp(db,{dataDir,origin,demo}).listen(port,host,()=>console.log(`물품이음 http://${host}:${port} | ${demo?'합성 데이터 시연':'수동 업무 모드'} | DB=${dataDir}/trade.sqlite`));
+for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>server.close(()=>{db.close();process.exit(0);}));

@@ -1,0 +1,9 @@
+import {z} from 'zod';
+const text=(max=200)=>z.string().trim().max(max);
+export const integer=z.number().int().min(1).max(100000);
+export const groupSchema=z.object({condition:z.enum(['GOOD','USED','REPAIR','UNKNOWN']),quantity:integer,inspection:z.enum(['ALL','SAMPLE','NONE']),note:text(1000).default('')});
+export const lotSchema=z.object({title:text(100).min(2),category:z.enum(['FURNITURE','ELECTRONICS','OFFICE','EDUCATION','OTHER']),manufacturer:text(),model:text(),description:text(4000),actualCount:integer,ledgerCount:integer,decisionQty:integer,decisionRef:text(),decisionDate:text(10),sourceTargetReference:text(1000),originalName:text(),classificationCode:text(10).regex(/^$|^\d{8}$|^\d{10}$/,'분류번호는 비우거나 8/10자리 숫자로 입력하세요.'),identificationCode:text(30),mismatchNote:text(2000),pickup:text(1000),needsWipe:z.boolean(),specialReview:z.boolean(),privacyChecked:z.boolean(),groups:z.array(groupSchema).min(1).max(30)}).superRefine((v,ctx)=>{if(v.groups.reduce((n,g)=>n+g.quantity,0)!==v.actualCount)ctx.addIssue({code:'custom',message:'상태별 수량 합계와 실사 수량을 맞춰 주세요.',path:['groups']});if(v.actualCount>v.decisionQty)ctx.addIssue({code:'custom',message:'실사 수량이 불용결정 대상 수량보다 큽니다.',path:['decisionQty']});});
+export const reviewSchema=z.object({approved:z.boolean(),note:text(2000).min(4),checks:z.object({decision:z.literal(true),targets:z.literal(true),quantity:z.literal(true),reuse:z.literal(true),privacy:z.literal(true),inquiryScope:z.literal(true)})});
+export const requestSchema=z.object({groupId:z.string().uuid(),quantity:integer,purpose:text(1000).min(2),pickupDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)});
+export const assetSchema=z.object({externalId:text(100).min(1),originalName:text(200).min(1),quantity:integer,classificationCode:text(20).default(''),identificationCode:text(50).default(''),acquiredDate:text(30).default(''),acquiredPrice:text(50).default('')});
+export function parse(schema,input){return schema.parse(input);}

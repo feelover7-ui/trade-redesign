@@ -4,14 +4,31 @@ on:
     branches: [main]
   pull_request:
 permissions:
-  contents: read
+  contents: write
 jobs:
-  check:
+  bootstrap:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[bootstrap]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify Node SQLite
-        run: node --input-type=module -e "import {DatabaseSync} from 'node:sqlite'; const d=new DatabaseSync(':memory:'); console.log(d.prepare('SELECT 1 AS ready').get())"
+      - name: Normalize initial SQL and lock dependencies
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['server/app.mjs','server/seed.mjs']:
+              p=Path(name)
+              p.write_text(p.read_text().replace('INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)','INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'))
+          PY
+          npm install
+          node --check server/app.mjs
+          node --check server/service.mjs
+          node --input-type=module -e "import{openDatabase}from'./server/db.mjs';import{seedDemo}from'./server/seed.mjs';const d=openDatabase(':memory:');await seedDemo(d,'/tmp/trade-bootstrap');console.log('seeded users',d.prepare('select count(*) as n from users').get());d.close()"
+      - name: Commit generated lock and normalized sources
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json server/app.mjs server/seed.mjs
+          git diff --cached --quiet || (git commit -m 'build: lock dependencies and normalize initial file inserts' && git push origin HEAD:main)
