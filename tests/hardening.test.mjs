@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fixture,draft,approval,fileRecord} from './helpers.mjs';
+import {audit} from '../server/db.mjs';
+import * as svc from '../server/service.mjs';
+import {normalizeUploadName} from '../server/file-names.mjs';
+test('나중에 본문을 편집한 검토자도 자신의 내용은 승인할 수 없음',t=>{const f=fixture();t.after(()=>f.db.close());const id=svc.saveLot(f.db,f.editor,draft());svc.saveLot(f.db,f.reviewer,{...draft(),description:'검토자가 직접 편집한 내용',version:1},id);fileRecord(f,f.editor,id,null,'PHOTO');fileRecord(f,f.editor,id);svc.submitLot(f.db,f.editor,id);assert.throws(()=>svc.reviewLot(f.db,f.reviewer,id,approval()),e=>e.status===403);});
+test('게시 증빙을 변경한 검토자도 독립 검토자가 될 수 없음',t=>{const f=fixture();t.after(()=>f.db.close());const id=svc.saveLot(f.db,f.editor,draft());fileRecord(f,f.editor,id,null,'PHOTO');const fid=fileRecord(f,f.reviewer,id);audit(f.db,f.reviewer,'FILE_UPLOAD',fid,{lotId:id});svc.submitLot(f.db,f.editor,id);assert.throws(()=>svc.reviewLot(f.db,f.reviewer,id,approval()),e=>e.status===403);});
+test('클라이언트가 원본 대장 필드를 바꿔 보내도 서버가 원본을 유지',t=>{const f=fixture();t.after(()=>f.db.close());const id=svc.saveLot(f.db,f.editor,draft());svc.saveLot(f.db,f.editor,{...draft(),originalName:'변조',ledgerCount:100,classificationCode:'12345678',version:1},id);const lot=svc.getLot(f.db,f.editor,id);assert.equal(lot.data.originalName,'의자 원본');assert.equal(lot.data.ledgerCount,20);assert.equal(lot.data.classificationCode,'');});
+test('한글 업로드 파일명 UTF-8 보존 및 제어문자 제거',()=>{assert.equal(normalizeUploadName(Buffer.from('불용결정_증빙.pdf').toString('latin1')),'불용결정_증빙.pdf');assert.equal(normalizeUploadName('한글사진.webp'),'한글사진.webp');assert.equal(normalizeUploadName('bad\nname.pdf'),'badname.pdf');});

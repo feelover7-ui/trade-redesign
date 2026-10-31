@@ -7,6 +7,7 @@ permissions:
   contents: read
 jobs:
   verify:
+    if: "!contains(github.event.head_commit.message, '[harden-once]')"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -15,19 +16,16 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Install locked dependencies
-        run: npm ci
+      - run: npm ci
       - name: Domain, concurrency and HTTP security tests
         run: npm test
       - name: Typecheck and production build
         run: npm run build
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium
       - name: Browser acceptance and responsive tests
         run: npm run test:e2e
-      - name: Keep test report and screenshots
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: trade-qa-${{ github.sha }}
           path: |

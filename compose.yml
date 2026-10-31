@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4310:4310"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4310
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:4310}
+      DATA_DIR: /app/data
+      DEMO_MODE: "false"
+      SECURE_COOKIE: ${SECURE_COOKIE:-false}
+    volumes:
+      - trade-data:/app/data
+volumes:
+  trade-data:
