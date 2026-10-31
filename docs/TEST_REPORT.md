@@ -1,5 +1,29 @@
 # MVP 검증 기록 — 2026-10-31
 
+## NAS·Cloudflare 시연 배포 검증 — 최신
+
+사용자 지정 대상 **[https://trade.h19h19.com](https://trade.h19h19.com)** 에 배포했다. 앱 소스는 `174431a7fedc0efb53c5d3d9e0e108e27eeb5099`, NAS 이미지는 `mulppum-ieum:174431a`다. 데이터·업로드·백업은 NAS 볼륨2에 있고 기존 Mac 데이터는 보존했다. 기관용 정식 운영이나 외부 API 연결 완료를 뜻하지 않는다.
+
+| 검사 | 결과 |
+|---|---|
+| NAS Docker 실제 빌드 | Node 24.22.2 / Linux amd64 / Docker 24.0.2 / Compose 2.20.1 통과 |
+| 수정 후 서버 회귀 | 로컬·NAS 컨테이너 모두 **40개 통과**, 실패 0 |
+| 수정 후 브라우저 회귀 | 설치된 Chrome에서 **6개 통과**, 실패 0 |
+| TypeScript·프런트 빌드 / 의존성 검사 | 통과 / `npm audit --audit-level=low` 취약점 0 |
+| 실제 HTTPS | TLS 인증서 검증 통과, 루트·`/api/health` 200, HTTP→HTTPS 308 |
+| 실제 도메인 인증·권한 | 로그인, Secure/HttpOnly/SameSite 쿠키, 잘못된 CSRF 403, 타 기관 초안·사진 404 |
+| 실제 파일·CSV | 한글 사진·증빙 업로드·WebP 재인코딩·파일명 다운로드 헤더·UTF-8 BOM CSV·API `no-store` 확인 |
+| 영속성 | 공개 도메인에서 저장한 합성 초안·사진이 이미지 교체와 앱 재시작 뒤에도 유지 |
+| NAS 백업복원 | 일관된 DB·첨부 **14개** 백업, 별도 새 경로 복원, 별도 비공개 컨테이너에서 로그인·초안·사진·파일 ACL 통과 |
+| 실제 화면 | 1440×1000 데스크톱 / 390×844 모바일 캡처·열람, 모바일 가로 넘침 없음 |
+| 기존 서비스 보존 | 새 앱 이외 기존 컨테이너 ID 전부 유지. 기존 터널 세 경로의 설정·응답 유지 |
+
+Docker 기본 주소 풀이 소진된 문제는 기존 네트워크를 변경하지 않고 겹치지 않는 앱 전용 대역으로 해결했다. 실제 HTTP 접속이 HTTPS로 전환되지 않는 점을 발견해 HTTPS 출처를 사용하는 앱의 프록시 HTTP 요청에만 308을 적용하고 회귀 테스트를 추가했다. 내부 헬스체크는 계속 사용할 수 있다.
+
+NAS의 실제 소스·데이터·백업·복원 경로와 복구 절차는 [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)에 있다. 모든 자료는 합성 데이터이며 외부 API·AI capability는 계속 false다. Cloudflare 통계 스크립트는 기존 CSP가 차단하고 있으며 사이트 기능 검증을 위해 이를 허용하도록 정책을 완화하지 않았다. NAS 전체 장애용 별도 저장소 백업과 기관 운영 승인은 이번 범위에 없다.
+
+실제 배포 화면: [NAS 데스크톱](screenshots/nas-desktop-market.png), [NAS 모바일](screenshots/nas-mobile-market.png).
+
 ## 최신 후속 로컬 검수
 
 macOS arm64 / Node **24.22.2** / npm 11.19.1 / 설치된 Google Chrome **156.0.8078.74**에서 실행했다. 시작 기준 main은 `9e34e47ed7d663bd5fcca1785eb4851e2d178deb`이다. 실제 기관 데이터·외부 서비스키는 사용하지 않았다.

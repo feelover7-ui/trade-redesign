@@ -23,6 +23,14 @@ curl --fail http://127.0.0.1:14310/api/health
 
 NAS 버전에 따라 `docker compose` 또는 검증된 `docker-compose` 명령을 사용한다. 기존 Docker 설치나 다른 스택을 바꾸지 않는다.
 
+이번 NAS는 Docker 기본 주소 풀이 소진되어 있었다. 기존 네트워크·라우팅과 겹치지 않는 `10.253.43.0/28`을 검사한 뒤 `deploy/nas.network.compose.yml`을 추가하여 이 앱 전용 네트워크만 만들었다. 현재 NAS에서 사용하는 명령은 다음과 같다. 상위 폴더 권한을 바꾸지 않고 기존에 허용된 sudo를 사용한다.
+
+```sh
+sudo -n /usr/local/bin/docker-compose --env-file /volume2/docker/trade/.env.nas \
+  -f /volume2/docker/trade/current/deploy/nas.compose.yml \
+  -f /volume2/docker/trade/current/deploy/nas.network.compose.yml ps
+```
+
 ## Cloudflare 연결
 
 기존 NAS Tunnel이 있다면 설정 사본을 보존한 뒤 **새 hostname 경로 하나만 추가**한다. cloudflared가 NAS 호스트 네트워크에서 실행되면 원본은 `http://127.0.0.1:14310`이다. Docker bridge에서 실행되는 터널은 별도 네트워크 접근을 확인해야 하므로 loopback 주소를 그대로 넣지 않는다.
@@ -39,8 +47,27 @@ HTTPS 인증서·HTTP→HTTPS 전환, 로그인·로그아웃, Secure/HttpOnly/S
 
 문제가 있으면 새 `trade` 경로와 이 Compose 프로젝트만 중지하고 소스 릴리스·환경 경로를 이전 값으로 되돌린다. `down -v`, DB 삭제, `docker system prune`, 기존 서비스 전체 재시작은 사용하지 않는다.
 
-## 현재 결과
+## 실제 배포 결과 — 2026-10-31
 
-Cloudflare 계정의 도메인 활성 상태와 기존 NAS Tunnel의 정상 연결을 읽기 전용으로 확인했다. 아직 NAS의 SSH 접속 계정·포트가 확인되지 않아 컨테이너 빌드·볼륨2 저장소 확인·DNS/경로 변경·실제 배포는 실행하지 않았다.
+**[https://trade.h19h19.com](https://trade.h19h19.com)** 에 NAS 합성 시연 배포를 완료했다. 로컬 Mac에서 서버를 실행하지 않아도 NAS의 Docker 앱과 기존 NAS Cloudflare Tunnel로 응답한다. 사용자가 알려준 「포켓몬」 채팅의 기존 NAS 접속 설정을 찾아 사용했으며 인증 키·터널 비밀 자료는 복사하거나 Git에 넣지 않았다.
 
-로컬 Node 24에서 서버 회귀 39개·브라우저 6개·빌드를 통과했고 NAS Compose 두 파일의 YAML 구문을 확인했다. 실제 Docker Compose 해석·컨테이너 실행 검증은 NAS 접속 후 수행한다.
+| 항목 | 실제 구성 |
+|---|---|
+| 앱 소스 | `174431a7fedc0efb53c5d3d9e0e108e27eeb5099` |
+| 컨테이너 / 이미지 | `mulppum-ieum-app-1` / `mulppum-ieum:174431a` |
+| 이미지 ID | `sha256:8c6b595bd5ba3e5aa001a6520954f8d7ff6597a5873f0e717ce93a21f1ef04e3` |
+| 실행 환경 | NAS Linux amd64, Docker 24.0.2, Compose 2.20.1, Node 24.22.2 |
+| 소스 / 현재 릴리스 | `/volume2/docker/trade/releases/174431a` / `/volume2/docker/trade/current` |
+| DB·업로드 | `/volume2/docker/trade/demo-data/trade.sqlite`, 같은 경로의 `uploads/` |
+| 백업 | `/volume2/docker/trade/backups/2026-10-31T06-05-17.229Z` |
+| 검증한 복원 사본 | `/volume2/docker/trade/restore-checks/2026-10-31T06-05-17.229Z` |
+| 접근 / 재시작 | 호스트 `127.0.0.1:14310`만 공개, restart=`unless-stopped`, health=`healthy` |
+| 외부 접근 | Cloudflare 프록시 DNS → 기존 NAS Tunnel → `http://127.0.0.1:14310` |
+
+NAS 컨테이너에서 `npm ci`·빌드·서버 **40개 테스트**를 통과했다. 실제 도메인의 HTTPS 인증서, HTTP→HTTPS **308** 전환, Secure/HttpOnly/SameSite 쿠키, 로그인, CSRF 거부, 비공개 초안·파일의 기관 격리, 한글 사진·증빙 업로드/다운로드, UTF-8 BOM CSV를 확인했다. API는 `no-store`를 유지한다. 데스크톱 1440×1000과 모바일 390×844 화면을 실제로 열어 확인했으며 모바일 페이지 가로 넘침이 없다.
+
+공개 도메인에서 만든 합성 초안과 첨부가 이미지 교체·컨테이너 재시작 뒤에도 남는 것을 확인했다. 앱만 중지한 상태에서 **첨부 14개**를 포함한 일관된 백업을 생성하고 즉시 앱을 재기동했다. 백업을 새 경로에 복원해 별도 비공개 시험 컨테이너에서 로그인·원본 초안·사진·타 기관 파일 차단을 검증했다. 시험 컨테이너만 제거했으며 DB·첨부·백업·복원 사본은 모두 보존했다.
+
+기존 터널 설정은 `/volume2/docker/trade/deployments/cloudflared-routing-before.yml`에 보존한 뒤 새 hostname 규칙 한 개만 추가했다. 기존 세 규칙은 바이트 단위로 유지했다. 터널 커넥터만 재시작해 적용했고 기존 세 도메인의 응답은 이전과 동일했다. 다른 앱 컨테이너의 ID는 모두 유지됐다. 기존 터널 토큰이나 자격증명은 변경하지 않았다.
+
+이 배포는 **합성 시연용**이다. 기관 운영 승인·외부 API/AI·실제 기관 자료 반입은 포함하지 않는다. 백업복원은 같은 NAS 볼륨 안에서 확인했으며 NAS 전체 장애를 대비한 별도 저장소 백업은 후속 운영 설정이다. Cloudflare가 삽입하려는 통계 스크립트는 기존 CSP가 차단하며, 이를 허용하려고 보안 정책을 완화하지 않았다.

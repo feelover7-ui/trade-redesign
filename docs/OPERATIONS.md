@@ -57,7 +57,7 @@ Documents 작업폴더의 파일이 `dataless` 상태가 되어 읽기 시간초
 
 ## Docker
 
-Dockerfile은 Node 24에서 빌드하고 하나의 서버로 정적 파일과 API를 제공한다. compose의 기본 포트는 호스트 loopback에만 공개한다. 최초 관리자 계정은 `docker compose run --rm app npm run setup`으로 발급한 뒤 `docker compose up -d`한다. 운영체제와 볼륨 권한을 먼저 검증해야 한다. 현재 세션에서는 Docker 실제 실행 검증은 하지 않았으며 Codex 로컬 검수 대상이다.
+Dockerfile은 Node 24에서 빌드하고 하나의 서버로 정적 파일과 API를 제공한다. compose의 기본 포트는 호스트 loopback에만 공개한다. 최초 관리자 계정은 `docker compose run --rm app npm run setup`으로 발급한 뒤 `docker compose up -d`한다. 운영체제와 볼륨 권한을 먼저 검증해야 한다. 2026-10-31 NAS Docker 24.0.2에서 빌드·40개 서버 테스트·시연 실행·실제 HTTPS·백업복원을 검증했다. NAS 전용 Compose와 저장경로, 합성 시연 설정은 [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)를 따른다.
 
 ## 정식 운영 전 필요한 조치
 
