@@ -1,12 +1,12 @@
-name: One-time release hardening
+name: Image dependency security update
 on:
   push:
     branches: [main]
 permissions:
   contents: write
 jobs:
-  harden:
-    if: contains(github.event.head_commit.message, '[harden-once]')
+  update:
+    if: contains(github.event.head_commit.message, '[upgrade-image-codec]')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -14,30 +14,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-      - run: python3 scripts/apply-hardening.py
-      - run: npm ci
-      - name: Inspect dependency advisories
-        run: |
-          npm audit --json > /tmp/trade-audit.json || true
-          node -e "const a=require('/tmp/trade-audit.json');console.log(JSON.stringify({metadata:a.metadata,vulnerabilities:a.vulnerabilities},null,2))"
+      - name: Install advisory-fixed image codec
+        run: npm install --save-exact sharp@0.35.5
+      - name: Require clean dependency audit
+        run: npm audit --audit-level=low
       - run: npm test && npm run build
       - run: npx playwright install --with-deps chromium && npm run test:e2e
-      - name: Save tested source changes and preview screenshots
+      - name: Commit verified lock and remove temporary build helpers
         run: |
-          mkdir -p docs/screenshots
-          cp test-results/desktop-market.png docs/screenshots/desktop-market.png
-          cp test-results/mobile-market.png docs/screenshots/mobile-market.png
-          cp test-results/desktop-case.png docs/screenshots/desktop-case.png
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add server src docs/screenshots
-          git commit -m 'fix: enforce independent review, immutable originals and atomic attachment gates'
+          git rm .github/workflows/hardening.yml scripts/apply-hardening.py
+          git add package.json package-lock.json
+          git commit -m 'security: upgrade sharp to 0.35.5 and remove temporary maintenance workflows'
           git push origin HEAD:main
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hardening-results
+          name: dependency-security-qa
           path: |
             playwright-report/
             test-results/
