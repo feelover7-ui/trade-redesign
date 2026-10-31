@@ -1,0 +1,42 @@
+name: mulppum-ieum
+services:
+  app:
+    build:
+      context: ..
+    image: mulppum-ieum:${TRADE_RELEASE:-local}
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${TRADE_NODE_ENV:-production}
+      HOST: 0.0.0.0
+      PORT: 4310
+      APP_ORIGIN: https://trade.h19h19.com
+      DATA_DIR: /app/data
+      DEMO_MODE: ${TRADE_DEMO_MODE:-false}
+      SECURE_COOKIE: "true"
+    volumes:
+      - type: bind
+        source: ${TRADE_DATA_DIR:?Set the verified absolute Volume 2 data directory}
+        target: /app/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${TRADE_BACKUP_DIR:?Set the verified absolute Volume 2 backup directory}
+        target: /app/backups
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:${TRADE_LOCAL_PORT:-14310}:4310"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4310/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true

@@ -9,3 +9,6 @@ backups
 playwright-report
 test-results
 *.log
+output
+.playwright-cli
+deploy/runtime

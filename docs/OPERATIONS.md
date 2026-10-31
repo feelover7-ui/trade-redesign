@@ -49,7 +49,7 @@ npm run restore -- backups/<시각> /절대경로/아직없는새DATA_DIR
 
 `.env`에 승인된 HTTPS APP_ORIGIN, SECURE_COOKIE=true, NODE_ENV=production, 명시적인 절대 DATA_DIR을 설정한 뒤 `npm run preflight`를 실행한다. 읽기 전용 검사이며 배포하거나 DB를 초기화하지 않는다. 시연 계정 포함 DB, 첨부 누락·손상, 미설정 HTTPS 조건은 실패로 보고한다.
 
-코드 검사만으로 호스팅 승인, 실제 HTTPS 종단, 마운트된 영속 볼륨, 기관망 접근, 별도 저장소 백업을 확보했다고 판단하지 않는다. 복원 사본을 실제로 기동하고 로그인·파일 ACL·완료 거래를 확인한 다음 승인된 대상으로만 배포한다. 현재는 승인된 대상이 없으므로 로컬 loopback 시연을 유지한다.
+코드 검사만으로 호스팅 승인, 실제 HTTPS 종단, 마운트된 영속 볼륨, 기관망 접근, 별도 저장소 백업을 확보했다고 판단하지 않는다. 복원 사본을 실제로 기동하고 로그인·파일 ACL·완료 거래를 확인한 다음 승인된 대상으로만 배포한다. 사용자는 이후 NAS 볼륨2와 Cloudflare의 `trade.h19h19.com`을 시연 배포 대상으로 지정했다. 실제 진행 상태는 [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)에 기록한다. 기관 업무 운영 승인은 별도이며 실제 기관 데이터는 반입하지 않는다.
 
 ## 이번 macOS 검수 경로
 

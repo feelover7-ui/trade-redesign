@@ -1,0 +1,22 @@
+services:
+  tunnel:
+    image: cloudflare/cloudflared:${CLOUDFLARED_VERSION:-2026.5.2}
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token-file /run/secrets/tunnel-token
+    volumes:
+      - type: bind
+        source: ${TRADE_TUNNEL_TOKEN_FILE:?Set the NAS-local token file path}
+        target: /run/secrets/tunnel-token
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
