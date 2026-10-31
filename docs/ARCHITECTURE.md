@@ -79,3 +79,5 @@ Express 5 서버
 ## 외부 연계 확장
 
 현재 `capabilities`는 모두 false다. `EdufineAdapter`, `ProcurementAdapter`, `OnbidAdapter`, `AiAdapter`는 가짜 응답 대신 `NOT_CONNECTED` 오류를 던진다. 실제 명세·사용승인 확보 후 이 내부 계약을 구현하고, 기관권한·외부참조번호·확인시각·원문해시·요청멱등키를 보존하는 별도 마이그레이션을 추가한다. 수동 확인과 공식 API 확인의 출처를 혼합하지 않는다.
+
+2026-10-31 조달청·온비드 공개 조회 명세 확인 결과와 아직 필요한 이용승인·키는 [INTEGRATION_READINESS.md](INTEGRATION_READINESS.md)에 기록했다. 공식 쓰기·AI 연결은 추가하지 않았다. 이번 변경은 DB 스키마를 변경하지 않으며 user_version=1을 유지한다. 백업/복원 검증은 `scripts/storage.mjs`, 배포 전 읽기 전용 검사는 `scripts/preflight.mjs`에 있다.

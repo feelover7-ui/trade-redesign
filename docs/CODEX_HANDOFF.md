@@ -1,5 +1,9 @@
 # Codex 인계: 로컬 완성·공식 API·AI 연결
 
+## 2026-10-31 로컬 후속 검수
+
+macOS의 Documents/iCloud 파일 읽기 오류로 원본 폴더를 보존한 채 `~/Developer/trade` 작업 사본에서 검수했다. Node 24.22.2와 설치된 Chrome을 사용한다. 시연은 localhost:4310, 자동 검수는 4311과 실행별 새 DB로 분리했다. 최신 결과는 [TEST_REPORT.md](TEST_REPORT.md), 확인된 공식 조회 명세·필요 권한은 [INTEGRATION_READINESS.md](INTEGRATION_READINESS.md)를 읽는다. 외부 키·AI 공급자 승인·배포 대상은 아직 제공되지 않았으며 모든 연결은 미연결이다. 스키마 변경은 없다.
+
 ## 바로 복사할 작업 지시
 
 ```text

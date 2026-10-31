@@ -11,5 +11,5 @@ if(origin.startsWith('https://')&&process.env.SECURE_COOKIE!=='true')throw new E
 const db=openDatabase(resolve(dataDir,'trade.sqlite'));
 if(demo)await seedDemo(db,dataDir);
 const host=process.env.HOST||'127.0.0.1',port=Number(process.env.PORT||4310);
-const server=createApp(db,{dataDir,origin,demo}).listen(port,host,()=>console.log(`물품이음 http://${host}:${port} | ${demo?'합성 데이터 시연':'수동 업무 모드'} | DB=${dataDir}/trade.sqlite`));
+const server=createApp(db,{dataDir,origin,demo}).listen(port,host,()=>console.log(`물품이음 ${origin} | 바인딩=${host}:${port} | ${demo?'합성 데이터 시연':'수동 업무 모드'} | DB=${dataDir}/trade.sqlite`));
 for(const sig of ['SIGTERM','SIGINT'])process.on(sig,()=>server.close(()=>{db.close();process.exit(0);}));

@@ -18,6 +18,10 @@ npm run demo
 
 브라우저에서 **http://localhost:4310**을 엽니다. 터미널을 닫으면 서버가 종료됩니다. 이 명령은 배포하지 않으며 다른 운영 DB를 삭제하지 않습니다.
 
+**2026-10-31 로컬 검수 보강:** Node 24/macOS/설치된 Chrome에서 전체 거래 흐름을 검수했습니다. 부분 첨부 실패 시 저장된 파일 표시와 재시도, HEIC 변환 안내, 중복 CSV 열 거부, 백업 무결성·새 경로 복원을 보강했습니다. 최신 결과는 [TEST_REPORT.md](docs/TEST_REPORT.md), 외부 명세·필요 권한은 [INTEGRATION_READINESS.md](docs/INTEGRATION_READINESS.md)에 기록합니다. 승인된 외부 키·AI 모델·배포 대상이 없어 실제 외부 연결과 원격 배포는 진행하지 않았습니다.
+
+macOS Documents/iCloud 경로에서 파일 읽기가 시간초과되거나 `dataless`로 표시되면 원본을 보존하고 동기화 폴더 밖의 작업 사본을 사용하세요. 이번 검수 사본은 `~/Developer/trade`입니다.
+
 개발 중에는 `npm run dev` → **http://localhost:5173**. 기본 개발·시연 데이터는 `data/demo/`에 유지됩니다. 반복 실행해도 초기화하지 않습니다.
 
 ### 합성 시연 계정
@@ -90,13 +94,17 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+브라우저 다운로드가 어려운 Mac에 Chrome이 설치되어 있으면 `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`로 실행할 수 있습니다. E2E는 시연 포트 4310을 재사용하지 않고 **4311 + 실행별 새 `data/e2e-*`**를 사용합니다. 4311이 사용 중이면 `E2E_PORT=4312`처럼 지정하세요. 기존 DB나 이전 검수 데이터는 삭제하지 않습니다.
+
 Linux에서 브라우저 시스템 패키지가 없으면 `npx playwright install --with-deps chromium`을 사용합니다.
 
 GitHub Actions는 Node 24에서 도메인·동시 예약·HTTP 보안 테스트 → TypeScript 검사/프로덕션 빌드 → Chromium E2E/모바일 폭 테스트를 실행합니다. 결과·스크린샷은 **Actions → Trade CI → Artifacts**의 `trade-qa-*`에, 성공한 소스+빌드는 `trade-mvp-source-and-build`에 저장합니다. 테스트 통과 여부는 각 커밋의 Actions 결과가 기준입니다.
 
 ## 6. 백업·배포
 
-`npm run backup`은 타임스탬프 디렉터리에 SQLite 백업과 첨부 복사본을 생성합니다. **DB와 첨부의 일관성을 위해 앱을 중지한 뒤 실행하는 것을 권장**합니다. 복원은 [운영 문서](docs/OPERATIONS.md)를 따릅니다. 사용자 DB를 삭제하거나 초기화하는 명령은 제공하지 않습니다.
+`npm run backup`은 타임스탬프 디렉터리에 SQLite 백업·첨부·SHA-256 검증표를 생성하고 DB 무결성과 첨부 해시를 검사합니다. 원본 DB가 없으면 빈 DB를 만들지 않고 실패합니다. **DB와 첨부의 일관성을 위해 앱을 중지한 뒤 실행하세요.** `npm run restore -- <백업경로> <존재하지_않는_새_DATA_DIR>`은 검증 후 새 경로로만 복원합니다. 기존 경로는 덮어쓰지 않습니다. 상세 절차는 [운영 문서](docs/OPERATIONS.md)를 따릅니다.
+
+승인된 배포 설정을 준비한 뒤 `npm run preflight`로 Node·HTTPS 출처·Secure 쿠키·명시적 저장경로·데모 계정 분리·DB/첨부 무결성을 검사하세요. 이 검사는 읽기 전용이며 실제 TLS 종단, 영속 볼륨, 별도 저장소 백업, 기관 보안·배포 승인은 따로 확인해야 합니다.
 
 본 앱은 **단일 Node 서버 + 영속 디스크**가 필요합니다. 정적 사이트만 배포하거나 SQLite를 임시 파일시스템에 두면 안 됩니다. Docker 구성을 포함하지만, 기본은 로컬 검토용입니다. 원격 접속은 승인된 HTTPS 인프라와 보안 설정을 갖춘 뒤 진행하세요. 개인 NAS나 무료 클라우드에 실제 교육기관 자료를 먼저 넣는 방식은 권장하지 않습니다.
 

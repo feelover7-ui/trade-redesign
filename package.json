@@ -15,7 +15,9 @@
     "test:e2e": "playwright test",
     "check": "npm test && npm run build",
     "setup": "node --env-file-if-exists=.env scripts/setup.mjs",
-    "backup": "node --env-file-if-exists=.env scripts/backup.mjs"
+    "backup": "node --env-file-if-exists=.env scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs",
+    "preflight": "node --env-file-if-exists=.env scripts/preflight.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
