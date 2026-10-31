@@ -4,31 +4,46 @@ on:
     branches: [main]
   pull_request:
 permissions:
-  contents: write
+  contents: read
 jobs:
-  bootstrap:
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[bootstrap]')
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Normalize initial SQL and lock dependencies
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Domain, concurrency and HTTP security tests
+        run: npm test
+      - name: Typecheck and production build
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser acceptance and responsive tests
+        run: npm run test:e2e
+      - name: Keep test report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trade-qa-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - name: Package runnable source with built frontend
+        if: success()
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in ['server/app.mjs','server/seed.mjs']:
-              p=Path(name)
-              p.write_text(p.read_text().replace('INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)','INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'))
-          PY
-          npm install
-          node --check server/app.mjs
-          node --check server/service.mjs
-          node --input-type=module -e "import{openDatabase}from'./server/db.mjs';import{seedDemo}from'./server/seed.mjs';const d=openDatabase(':memory:');await seedDemo(d,'/tmp/trade-bootstrap');console.log('seeded users',d.prepare('select count(*) as n from users').get());d.close()"
-      - name: Commit generated lock and normalized sources
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package-lock.json server/app.mjs server/seed.mjs
-          git diff --cached --quiet || (git commit -m 'build: lock dependencies and normalize initial file inserts' && git push origin HEAD:main)
+          mkdir -p /tmp/trade-package
+          git archive HEAD | tar -x -C /tmp/trade-package
+          cp -R dist /tmp/trade-package/dist
+          tar -czf trade-mvp-source-and-build.tar.gz -C /tmp/trade-package .
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: trade-mvp-source-and-build
+          path: trade-mvp-source-and-build.tar.gz
+          retention-days: 14
