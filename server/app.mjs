@@ -18,7 +18,7 @@ export function createApp(db,{dataDir=resolve(process.env.DATA_DIR||'./data'),or
   const uploadDir=join(dataDir,'uploads');mkdirSync(uploadDir,{recursive:true,mode:0o700});
   const secure=process.env.SECURE_COOKIE==='true';
   const cookie=(token,age=28800)=>`trade_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure?'; Secure':''}`;
-  app.use((req,res,next)=>{res.set({'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'geolocation=(), microphone=()','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"});if(req.path.startsWith('/api'))res.set('Cache-Control','no-store');next();});
+  app.use((req,res,next)=>{res.set({'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'geolocation=(), microphone=()','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"});if(req.path.startsWith('/api'))res.set('Cache-Control','no-store');if(origin.startsWith('https://')&&req.get('X-Forwarded-Proto')?.split(',')[0].trim()==='http')return res.redirect(308,origin+req.originalUrl);next();});
   app.use(express.json({limit:'2mb'}));
   app.get('/api/health',(req,res)=>res.json({ok:true,version:'0.3.0'}));
   app.get('/api/meta',(req,res)=>res.json({demo,capabilities,version:'0.3.0'}));

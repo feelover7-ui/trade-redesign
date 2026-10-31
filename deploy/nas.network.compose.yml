@@ -1,0 +1,8 @@
+# Optional NAS override when Docker's default address pools are exhausted.
+# Verify this subnet against Docker IPAM and the NAS routing table before use.
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${TRADE_NETWORK_SUBNET:?Set a verified non-overlapping subnet}
