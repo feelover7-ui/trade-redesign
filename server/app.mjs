@@ -1,3 +1,4 @@
+import {mountRag} from './rag/routes.mjs';
 import express from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
@@ -14,15 +15,15 @@ import {mountEnhancements,photoLabelSchema,savePhotoLabel} from './enhancements.
 
 export const csvCell=v=>{const s=String(v??'');return '"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'"+s:s).replaceAll('"','""')+'"';};
 export const csv=rows=>'\uFEFF'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
-export function createApp(db,{dataDir=resolve(process.env.DATA_DIR||'./data'),origin=process.env.APP_ORIGIN||'http://localhost:4310',demo=process.env.DEMO_MODE==='true',enhancements={}}={}){
+export function createApp(db,{dataDir=resolve(process.env.DATA_DIR||'./data'),origin=process.env.APP_ORIGIN||'http://localhost:4310',demo=process.env.DEMO_MODE==='true',enhancements={},rag={}}={}){
   const app=express();app.disable('x-powered-by');
   const uploadDir=join(dataDir,'uploads');mkdirSync(uploadDir,{recursive:true,mode:0o700});
   const secure=process.env.SECURE_COOKIE==='true';
   const cookie=(token,age=28800)=>`trade_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure?'; Secure':''}`;
   app.use((req,res,next)=>{res.set({'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'geolocation=(), microphone=()','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"});if(req.path.startsWith('/api'))res.set('Cache-Control','no-store');if(origin.startsWith('https://')&&req.get('X-Forwarded-Proto')?.split(',')[0].trim()==='http')return res.redirect(308,origin+req.originalUrl);next();});
   app.use(express.json({limit:'2mb'}));
-  app.get('/api/health',(req,res)=>res.json({ok:true,version:'0.4.0'}));
-  app.get('/api/meta',(req,res)=>res.json({demo,capabilities,version:'0.4.0'}));
+  app.get('/api/health',(req,res)=>res.json({ok:true,version:'0.5.0'}));
+  app.get('/api/meta',(req,res)=>res.json({demo,capabilities,version:'0.5.0'}));
   app.post('/api/auth/login',throttle(),(req,res)=>{protectWrite(req,origin);const d=z.object({email:z.string().email().max(320),password:z.string().min(1).max(200)}).parse(req.body);const user=db.prepare('SELECT u.*,o.name AS org_name,o.district,o.active AS org_active FROM users u JOIN organizations o ON o.id=u.org_id WHERE email=?').get(d.email.toLowerCase().trim());const saved=user?.password_hash||'00000000000000000000000000000000:'+ '00'.repeat(64);const correct=verifyPassword(d.password,saved);must(user&&user.active&&user.org_active&&correct,'이메일 또는 비밀번호를 확인하세요.',401,'INVALID_LOGIN');const session=createSession(db,user.id);audit(db,user,'LOGIN',user.id);res.set('Set-Cookie',cookie(session.token));res.json({user:publicUser(user),csrf:session.csrf});});
   app.use('/api',requireAuth(db));
   app.use('/api',(req,res,next)=>{protectWrite(req,origin);next();});
@@ -67,6 +68,7 @@ export function createApp(db,{dataDir=resolve(process.env.DATA_DIR||'./data'),or
   app.post('/api/admin/users',(req,res)=>{requireRole(req.user,'ADMIN');const d=z.object({orgId:z.string().uuid(),name:z.string().trim().min(2).max(60),email:z.string().email().max(320),password:z.string().min(12).max(200),role:z.enum(['EDITOR','REVIEWER'])}).parse(req.body);must(db.prepare('SELECT 1 FROM organizations WHERE id=? AND active=1').get(d.orgId),'승인된 기관을 선택하세요.');const id=addUser(db,d);audit(db,req.user,'USER_CREATE',id,{orgId:d.orgId,role:d.role});res.status(201).json({id});});
   app.post('/api/admin/users/:id/status',(req,res)=>{requireRole(req.user,'ADMIN');must(req.params.id!==req.user.id,'현재 관리자 계정은 여기서 중지할 수 없습니다.');const active=z.boolean().parse(req.body.active);const row=db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);must(row,'계정을 찾을 수 없습니다.',404);db.prepare('UPDATE users SET active=? WHERE id=?').run(active?1:0,row.id);if(!active)db.prepare('DELETE FROM sessions WHERE user_id=?').run(row.id);audit(db,req.user,'USER_STATUS',row.id,{active});res.json({ok:true});});
   mountEnhancements(app,db,{dataDir,...enhancements});
+  mountRag(app,{dataDir,...rag});
   app.use('/api',(req,res)=>res.status(404).json({error:'존재하지 않는 기능입니다.'}));
   const dist=resolve('dist');if(existsSync(dist)){app.use(express.static(dist,{index:false,maxAge:'1h'}));app.get('/{*path}',(req,res)=>{res.set('Cache-Control','no-store');res.sendFile(join(dist,'index.html'));});}
   app.use((err,req,res,next)=>{if(res.headersSent)return next(err);if(err instanceof z.ZodError)return res.status(400).json({error:err.issues.map(x=>x.message).join(' / '),code:'VALIDATION_ERROR'});if(err instanceof multer.MulterError)return res.status(400).json({error:err.code==='LIMIT_FILE_SIZE'?'파일은 8MB 이하로 올려 주세요.':'업로드 파일 수/필드를 확인하세요.'});if(String(err.message).includes('UNIQUE constraint'))return res.status(409).json({error:'이미 등록된 값입니다. 중복을 확인하세요.',code:'DUPLICATE'});if(err.status)return res.status(err.status).json({error:err.message,code:err.code||'REQUEST_ERROR'});console.error('request_failed',{path:req.path,error:err.message});res.status(500).json({error:'처리 중 오류가 발생했습니다. 담당자에게 문의하세요.',code:'INTERNAL_ERROR'});});

@@ -12,3 +12,10 @@ test-results
 output
 .playwright-cli
 deploy/runtime
+
+# Private reference corpus and derived knowledge must not enter Git/images.
+rag-private
+private-corpus
+**/index.sqlite
+**/rag-usage.sqlite*
+**/README_PRIVATE.md

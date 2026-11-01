@@ -1,0 +1,20 @@
+# Optional read-only knowledge mount. Add ONLY after reviewing corpus access.
+# Preserve the existing nas.compose.yml + nas.network.compose.yml and DATA_DIR.
+services:
+  app:
+    environment:
+      RAG_AI_ENABLED: ${RAG_AI_ENABLED:-false}
+      RAG_MODEL: ${RAG_MODEL:-deepseek-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      RAG_EXTERNAL_APPROVED: ${RAG_EXTERNAL_APPROVED:-false}
+      RAG_DAILY_LIMIT: ${RAG_DAILY_LIMIT:-50}
+      RAG_LIBRARY_ENABLED: ${RAG_LIBRARY_ENABLED:-false}
+      RAG_LIBRARY_EXTERNAL_APPROVED: ${RAG_LIBRARY_EXTERNAL_APPROVED:-false}
+      RAG_CORPUS_DIR: /app/rag-private
+    volumes:
+      - type: bind
+        source: ${TRADE_RAG_CORPUS_DIR:?Set the reviewed absolute private corpus version directory}
+        target: /app/rag-private
+        read_only: true
+        bind:
+          create_host_path: false
