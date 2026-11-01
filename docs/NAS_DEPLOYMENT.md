@@ -47,7 +47,109 @@ HTTPS 인증서·HTTP→HTTPS 전환, 로그인·로그아웃, Secure/HttpOnly/S
 
 문제가 있으면 새 `trade` 경로와 이 Compose 프로젝트만 중지하고 소스 릴리스·환경 경로를 이전 값으로 되돌린다. `down -v`, DB 삭제, `docker system prune`, 기존 서비스 전체 재시작은 사용하지 않는다.
 
-## 실제 배포 결과 — 2026-10-31
+## v0.5 RAG 보존 업데이트 결과 — 2026-11-01
+
+**현재 앱은 [https://trade.h19h19.com](https://trade.h19h19.com)의 v0.5.0**이며 실제 배포 소스는 `d6bd5c9faef0d19bdee8db582da87df1750400a8`입니다. 앱 코드를 수정하지 않고 지정된 main 커밋 그대로 NAS에서 빌드·반영했습니다. 이전 v0.4 검수 문서가 main에 합쳐지지 않았으므로 이 문서에 해당 이력도 보존했습니다.
+
+| 항목 | 실제 구성 |
+|---|---|
+| 현재 릴리스 | `/volume2/docker/trade/releases/d6bd5c9faef0d19bdee8db582da87df1750400a8` (`current` 링크) |
+| 앱 / 이미지 | `mulppum-ieum-app-1` / `mulppum-ieum:d6bd5c9` |
+| 이미지 ID | `sha256:8f01948e814183810324dec01dc833ab9f9c9bf2d08d9ddefaa82637f4af624f` |
+| DB / 첨부 | `/volume2/docker/trade/demo-data/trade.sqlite` / 같은 경로 `uploads/`, 기존 경로·계정 유지 |
+| 지침 버전 경로 | `/volume2/docker/trade/knowledge/v0.5-20261101-9d7f2b4ffcd7/trade-rag-private-v05` |
+| 컨테이너 지침 | `/app/rag-private`, **읽기 전용**, UID1000 읽기 확인 |
+| 자료팩 보존본 | `/volume2/docker/trade/knowledge-packages/trade-rag-private-v05-9d7f2b4ffcd7.zip` (비공개) |
+| 인덱스 SHA-256 | `bd1a85c1f3ddfd398387b537291a8497e2ef05a2345483c28337504a7dbd4a11` |
+| 자료팩 ZIP SHA-256 | `9d7f2b4ffcd7289ca32260e3e5427585aed324d6db310533f6ff8e3cbcf3116a` |
+| 설치 / 서비스 공개 수 | 비공개121문서·8,164구간 / 서비스는 **프로그램8개·지침0개** |
+| RAG 모델 | 설정 별칭 `deepseek-flash`, 실제 계정 모델/반환ID는 **키 미제공으로 미확인** |
+| 검증 기록 | `/volume2/docker/trade/deployments/v05-2026-11-01T07-33-37Z/` |
+
+로컬은 미커밋 변경이 없는 `~/Developer/trade`에서 새 `codex/v05-nas-rag` 브랜치를 사용했습니다. 이전 문서 브랜치와 실제 v0.4 릴리스는 보존했고 NAS 이전 릴리스의 추적 파일 해시가 기준 커밋과 같은지 먼저 확인했습니다. 사용자가 명시한 영문 다운로드 파일 두 개가 전달한 자료팩·인계서임을 확인해 사용했습니다. 첨부의 실행 지시는 점검 참고이며 기관 공유/반출 승인 자체로 해석하지 않았습니다.
+
+자료팩은 ZIP 경로/심볼릭 링크·CRC를 검사하고 저장소 및 Docker 빌드 문맥 밖에 새 버전으로 해제했습니다. NAS 상위 공유 경로 권한은 변경하지 않았고 새 자료 하위 경로만 UID1000·디렉터리0500/파일0400으로 설정했습니다. 기존 Compose 두 파일에 `deploy/nas.rag.compose.yml`만 추가해 read-only bind를 연결했습니다. 이미지 빌드는 Git archive만 사용했으며 런타임 이미지에 자료팩·index·MD·원본 경로가 없는 것을 확인했습니다.
+
+### 승인·키 상태
+
+사용자는 공개 프로그램 안내/질문 및 지침의 DeepSeek 전송을 허용했고 키는 나중에 제공하기로 했습니다. 기관 간 지침 공유는 아직 미확인입니다. 따라서 실제 `.env.nas`의 RAG 설정은 다음과 같습니다. 키 원문은 Git·클라이언트·이 문서에 없습니다.
+
+```dotenv
+RAG_MODEL=deepseek-flash
+RAG_AI_ENABLED=false
+RAG_EXTERNAL_APPROVED=true
+RAG_LIBRARY_ENABLED=false
+RAG_LIBRARY_EXTERNAL_APPROVED=true
+RAG_DAILY_LIMIT=50
+```
+
+`TRADE_RAG_CORPUS_DIR`에는 위 NAS 버전 경로를 지정했습니다. `DEEPSEEK_API_KEY`는 현재 없으며 기본 빈 값으로 컨테이너에 전달됩니다. Codex 자체 모델·인증 및 기존 사진 AI 설정은 바꾸지 않았습니다. 공식 [모델 목록 문서](https://api-docs.deepseek.com/api/list-models/)에서 `deepseek-flash`/DeepSeek-V4.1-Flash 별칭을 확인했으나 계정 접근과 실제 응답 모델을 검증한 것은 아닙니다. `--live` 및 실제 DeepSeek20개 답변 검수는 키 제공 후 수행해야 합니다. 다른 모델로 자동 대체하지 않았습니다.
+
+서비스에서는 지침 검색 결과·직접 구절·원본 다운로드를 차단합니다. 검사 프로세스에서만 지침 활성화를 켜고 외부 포트 없는 `--network none` 컨테이너에서 원문 검색·후속 질문·원본 바이트 해시를 검수했습니다. 실제 앱 안에서 실행한 `rag:check`도 별도 검사 프로세스의 환경만 바꾸었으며 실행 중인 HTTP 서비스의 공유 설정을 바꾸지 않았습니다.
+
+### 백업·복원과 기존 서비스 보존
+
+| 단계 | 백업 / 별도 복원 경로 |
+|---|---|
+| 사전 업무DB | `backups/2026-11-01T07-34-44Z-v05-pre` / `restore-checks/2026-11-01T07-34-44Z-v05-pre` |
+| 별도 RAG 백업 | `rag-backups/2026-11-01T07-34-44Z-v05-pre` (자료 ZIP·호출한도 DB 유무 기록) |
+| 자료팩 복원 | `restore-checks/2026-11-01T07-34-44Z-v05-pre-corpus/trade-rag-private-v05` |
+| 교체 직전 업무DB | `backups/2026-11-01T07-39-40Z-v05-cutover` / 같은 이름의 `restore-checks/` 새 경로 |
+| 업데이트 후 업무DB | `backups/2026-11-01T07-43-25Z-v05-post` / 같은 이름의 `restore-checks/` 새 경로 |
+
+위 상대 경로의 부모는 모두 `/volume2/docker/trade/`입니다. 각 업무DB 백업은 앱만 중지한 상태에서 SQLite 무결성·참조·첨부15개 SHA-256을 확인하고 새 경로로 복원했습니다. 구버전 복원 서버에서 기존 로그인·초안·사진·상태배분·배송 기록을 확인한 뒤 새 이미지를 빌드했습니다. 새 버전의 복원 사본과 실제 DB 재오픈 모두 **기존19개 테이블 전체 행 해시 동일, user_version=2 유지**를 확인했습니다. RAG는 업무DB 마이그레이션을 추가하지 않습니다.
+
+자료팩은 별도로 ZIP을 보존·해시 검증하고 독립 복원 폴더의129개 파일을 전부 원본 해시와 대조했습니다. 실제 이미지와 실제 마운트에서 `rag:check`의121문서/8,164구간·manifest 일치를 확인했습니다. 모든 구간의 MD 출처 위치도 변환 규칙으로 재현해 검증했습니다. `rag-usage.sqlite`는 키·호출이 없어 사전/사후 모두 **존재하지 않음**을 별도 기록했습니다. 대화나 가짜 호출한도 DB를 만들지 않았습니다.
+
+향후 AI를 활성화하면 기본 업무DB 백업만으로 호출한도 DB까지 보존했다고 판단하지 마세요. 앱을 중지하고 `DATA_DIR/rag-usage.sqlite`를 SQLite backup API로 별도 백업해 무결성·SHA-256을 기록하고, 새 복원 DATA_DIR의 같은 파일에 복원·검증해야 합니다. 지침은 같은 버전의 ZIP/manifest/전체 파일을 별도 보존하세요. 현재 백업은 같은 NAS 볼륨의 검증이며 별도 저장소 장애복구는 남아 있습니다.
+
+업데이트 후 복원 서버에서 기존 계정·물품·첨부·배송 기록과 지침 미공유 상태를 확인했습니다. 시험 컨테이너만 제거하고 모든 백업·복원 사본·구버전 릴리스를 보존했습니다. 다른 앱 컨테이너ID, Docker network ID/subnet, Cloudflare 라우팅 해시, HTTPS 출처·Secure 쿠키·`127.0.0.1:14310`을 유지했고 터널도 재시작하지 않았습니다.
+
+문제가 생기면 앱만 중지하고 현행 데이터·RAG 사용량을 먼저 보존하세요. v0.4 복귀는 보존된 `9712affa...` 릴리스/이미지와 환경 설정을 사용하며 지침·RAG 백업은 삭제하지 않습니다. v0.5는 스키마2를 유지하므로 원본 DB를 초기화할 이유가 없습니다. 데이터 복원이 필요하면 검증한 백업을 **새 DATA_DIR**에 복원해 로그인·파일을 확인한 후 경로를 전환하세요.
+
+### 검사 결과와 남은 검수
+
+Node24/macOS 및 NAS Docker에서 서버73개·빌드, Chrome E2E11개, 알려진 npm 취약점0건을 확인했습니다. 실제 HTTPS에서 질문→프로그램 근거→출처 펼침→후속 질문→기능 이동을 1440px/390px로 조작하고 캡처를 열어 확인했습니다. 비로그인401·관리자403·CSRF403, 공유 미승인 원본/구절404, 키 없는 생성 요청의 검색 전용 상태를 확인했습니다. 오프라인20개 질의 검색은 수행했지만 실제 모델 생성은0회입니다. 상세는 [RAG_TEST_REPORT.md](RAG_TEST_REPORT.md)를 따릅니다.
+
+## 이전 v0.4 보존 업데이트 결과 — 2026-11-01
+
+**현재 서비스는 [https://trade.h19h19.com](https://trade.h19h19.com)의 v0.4.0 합성 시연**입니다. 최신 main 기준 `9712affa22991a4b021fccdb8e913b66d145a4f3`을 Git archive로 전달해 NAS에서 빌드했습니다. 앱 코드 변경 없이 해당 커밋 그대로 배포했으며 아래 v0.3 기록은 이전 이력입니다.
+
+| 항목 | 실제 확인값 |
+|---|---|
+| 소스 / 현재 릴리스 | `9712affa22991a4b021fccdb8e913b66d145a4f3` / `/volume2/docker/trade/releases/9712affa22991a4b021fccdb8e913b66d145a4f3` |
+| 현재 링크 | `/volume2/docker/trade/current` → 위 릴리스 |
+| 컨테이너 / 이미지 | `mulppum-ieum-app-1` / `mulppum-ieum:9712aff` |
+| 이미지 ID | `sha256:eb2e7d0b6237b70ea5db78889b8b90aa3edbdb274e3f22be016a47cc5f2f9094` |
+| DB / 업로드 | `/volume2/docker/trade/demo-data/trade.sqlite` / `/volume2/docker/trade/demo-data/uploads/` (동일 경로 유지) |
+| 런타임 | Node 24.22.2, `DEMO_MODE=true`, `NODE_ENV=development`, DB `user_version=2` |
+| 기존 연결 | `127.0.0.1:14310`, `10.253.43.0/28`, 기존 Docker network ID, HTTPS 출처·Secure 쿠키·Tunnel/DNS 유지 |
+| 최초 검증 백업 | `/volume2/docker/trade/backups/2026-11-01T06-38-04Z-v04-v1` |
+| 교체 직전 v1 백업 | `/volume2/docker/trade/backups/2026-11-01T06-41-33Z-cutover-v1` |
+| 업데이트·검수 후 v2 백업 | `/volume2/docker/trade/backups/2026-11-01T06-49-41Z-v04-post` |
+| 배포 검증 기록 | `/volume2/docker/trade/deployments/v04-2026-11-01T06-38-04Z/` (비공개 NAS 경로) |
+
+로컬 작업 사본 `~/Developer/trade`에는 미커밋 변경이 없었습니다. 기존 NAS 릴리스의 모든 추적 파일 SHA-256을 이전 커밋과 비교해 현장 수정이 없음을 확인했습니다. 데이터 경로·마운트와 DB 버전을 먼저 확인했고 기존 DB를 새로 만들거나 계정·첨부를 초기화하지 않았습니다. `.env.nas`는 NAS 내부에 원본을 보존한 뒤 `TRADE_RELEASE`만 변경했습니다. 다른 앱 컨테이너 ID, 기존 Docker network ID 및 Cloudflare 라우팅 설정의 SHA-256은 유지됐고 Tunnel 커넥터도 재시작하지 않았습니다.
+
+### 백업·마이그레이션·복원
+
+앱만 중지하고 v1 DB+uploads를 백업했습니다. SQLite 무결성/참조, 첨부 14개 SHA-256을 검사하고 `/volume2/docker/trade/restore-checks/2026-11-01T06-38-04Z-v04-v1`에 복원했습니다. 구버전의 별도 비공개 시험 컨테이너에서 기존 로그인·초안·사진·타기관 접근 차단을 확인한 뒤 기존 앱을 재가동했습니다.
+
+같은 백업을 새 `2026-11-01T06-38-04Z-v04-v1-migrated-v2` 경로에 다시 복원하여 v2로 마이그레이션했습니다. 기존 **13개 테이블 전체 행의 정렬된 JSON 해시**가 전후 동일했고 재오픈도 멱등이었습니다. 기관 3개·계정 7개·물품 7개·자산 6개·첨부 14개를 포함한 기존 자료와 로그인·파일 ACL을 확인했습니다. NAS 이미지 빌드·59개 서버 테스트 후 교체 직전 v1 백업과 별도 `2026-11-01T06-41-33Z-cutover-v1` 복원 사본을 추가했습니다. 실제 DB 마이그레이션에서도 같은 전체 행 보존 검사를 통과한 후 앱 컨테이너만 교체했습니다.
+
+공개 사이트 검수 후 앱을 다시 중지해 v2 백업을 만들고 `/volume2/docker/trade/restore-checks/2026-11-01T06-49-41Z-v04-post`에 복원했습니다. 별도 비공개 v0.4 서버에서 기존·신규 초안과 첨부 **15개**, 한글 사진 품명·명판 용도, 50/20/10 상태 배분, 저장한 배송 예상 기록을 확인했습니다. 실제 앱도 재기동 후 같은 검사를 통과했습니다. 시험 컨테이너만 제거하고 모든 백업·복원 디렉터리는 보존했습니다.
+
+**롤백 시 v2 원본에 v0.3을 바로 실행하지 마세요.** 먼저 앱만 중지하고 v2 DB·uploads를 별도로 백업합니다. 새 경로에 검증한 v1 백업을 복원한 뒤 `TRADE_DATA_DIR`을 그 사본으로, `TRADE_RELEASE`와 `current`를 보존된 `174431a` 릴리스로 바꾸고 동일 Compose 프로젝트의 앱만 실행하세요. 교체 후 신규 v2 자료는 v1 백업에 없으므로 별도로 보존·대조해야 합니다. 기존 원본을 덮어쓰거나 볼륨을 지우는 복구는 사용하지 않습니다.
+
+### 실제 도메인 검수와 남은 설정
+
+macOS/Node 24와 NAS Linux Docker에서 서버 **59개**, TypeScript/Vite 빌드, Chrome E2E **9개**를 통과했습니다(E2E는 로컬 4311의 별도 DB). 알려진 npm 취약점은 0건입니다. 실제 HTTPS 로그인·쿠키·HTTP→HTTPS 308·CSRF 거부·파일 ACL·한글 첨부·UTF-8 BOM CSV와 기존 자료의 영속성을 확인했습니다. 1440px/390px 화면을 직접 조작하고 생성 캡처를 이미지 뷰어로 열어 확인했습니다. 상세 검수는 [V04_TEST_REPORT.md](V04_TEST_REPORT.md)를 따릅니다.
+
+**비식별 실제 에듀파인 파일과 공급자 승인 자료는 제공되지 않았습니다.** 다단 머리글·수동 매핑·합계·80개 등록·재등록·충돌 롤백은 합성 XLSX/XLS로 검수했으며 실제 학교 양식 검수 완료로 표시하지 않습니다. 조달청/참고사진·AI 모델/키·주소/경로는 모두 false/빈 값이고 실제 외부 호출 성공은 없습니다. K-에듀파인·온비드 공식 연결도 미연결입니다. 기본 운송 단가는 `sample-2026-11-v1`의 시연용 가정이며 업체 확정 견적·예약·배차·결제가 아닙니다.
+
+`npm run preflight`는 HTTPS·Secure 쿠키·저장소 무결성은 통과하고, 현재 합성 시연 설정의 `NODE_ENV`, 데모 모드, 시연 계정 분리 조건은 **미충족(종료 1)** 으로 보고했습니다. 이를 우회하지 않았으며 기관 정식 운영 준비 완료를 주장하지 않습니다. 백업은 동일 NAS 볼륨 내부에서 검증했으며 별도 저장소 재해복구는 남아 있습니다.
+
+## 이전 v0.3 실제 배포 결과 — 2026-10-31
 
 **[https://trade.h19h19.com](https://trade.h19h19.com)** 에 NAS 합성 시연 배포를 완료했다. 로컬 Mac에서 서버를 실행하지 않아도 NAS의 Docker 앱과 기존 NAS Cloudflare Tunnel로 응답한다. 사용자가 알려준 「포켓몬」 채팅의 기존 NAS 접속 설정을 찾아 사용했으며 인증 키·터널 비밀 자료는 복사하거나 Git에 넣지 않았다.
 
