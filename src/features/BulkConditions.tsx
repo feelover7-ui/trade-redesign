@@ -1,0 +1,9 @@
+import {useState} from 'react';
+import {allocateConditionGroups} from '../../shared/bulk.mjs';
+import type {DraftGroup} from '../types';
+import {Field,Notice} from '../components/UI';
+export default function BulkConditions({total,onChange}:{total:number;onChange:(groups:DraftGroup[])=>void}){
+ const [counts,setCounts]=useState({used:0,repair:0,unknown:0}),[inspection,setInspection]=useState('NONE');const rest=total-counts.used-counts.repair-counts.unknown;
+ return <div className="bulk-shortcuts"><h3>대량 상태 빠른 입력</h3><p>모두 같은 상태이거나, 예외 수량만 알면 개별 물품을 하나씩 입력하지 않아도 됩니다.</p><Field label="빠른 입력 검수 범위"><select value={inspection} onChange={e=>setInspection(e.target.value)}><option value="NONE">아직 검수하지 않음</option><option value="SAMPLE">담당자 표본 확인</option><option value="ALL">담당자 전수 확인</option></select></Field><div className="actions">{[['GOOD','전체 양호'],['USED','전체 사용감'],['UNKNOWN','전체 미확인']].map(([condition,label])=><button type="button" className="button secondary compact" key={condition} disabled={!Number.isInteger(total)||total<1} onClick={()=>onChange([{condition,quantity:total,inspection:condition==='UNKNOWN'?'NONE':inspection,note:''}])}>{label}</button>)}</div>
+ <div className="form-grid">{([['used','사용감 있는 수량'],['repair','수리검토 수량'],['unknown','확인 못 한 수량']] as const).map(([k,label])=><Field key={k} label={label}><input type="number" min="0" max={total} value={counts[k]} onChange={e=>setCounts(c=>({...c,[k]:Number(e.target.value)}))}/></Field>)}</div><div className="sum-line">나머지 양호 <b>{Math.max(0,rest)}개</b> / 전체 {total}개</div>{rest<0?<Notice tone="warning">예외 수량이 전체 수량을 초과했습니다.</Notice>:null}<button type="button" className="button secondary" disabled={rest<0||!Number.isInteger(rest)||Object.values(counts).some(n=>n<0||!Number.isInteger(n))} onClick={()=>onChange(allocateConditionGroups(total,counts,inspection))}>예외 수량으로 상태 배분</button><p className="fineprint">버튼은 입력만 돕습니다. 검수 범위와 실제 수량은 담당자가 확인해야 하며 기존 상태 입력은 이 값으로 바뀝니다.</p></div>;
+}

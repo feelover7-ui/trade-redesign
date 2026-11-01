@@ -28,8 +28,8 @@ test('등록부터 독립 검토·양 기관 증빙·불일치 보류·대장 �
     await page.getByLabel('첨부할 사진의 얼굴·이름표·학교 보안정보를 확인하고 제거했습니다.').check();
     await page.getByRole('button',{name:'비공개 초안 저장',exact:true}).click();await toast(page,'초안을 저장');
     await expect(page).toHaveURL(/\/edit$/);const lotPath=new URL(page.url()).hash.replace(/\/edit$/,'');
-    await page.locator('.upload-control input').nth(0).setInputFiles({name:'한글_현물사진.png',mimeType:'image/png',buffer:photo});await toast(page,'첨부파일을 저장');
-    await page.locator('.upload-control input').nth(1).setInputFiles(attachment);await expect(page.getByRole('link',{name:'한글_합성증빙.png'})).toBeVisible();
+    await page.locator('.upload-control input[type=file]').nth(0).setInputFiles({name:'한글_현물사진.png',mimeType:'image/png',buffer:photo});await toast(page,'첨부파일을 저장');
+    await page.locator('.upload-control input[type=file]').nth(1).setInputFiles(attachment);await expect(page.getByRole('link',{name:'한글_합성증빙.png'})).toBeVisible();
     await page.getByRole('link',{name:'상세·게시 검토 화면'}).click();
     await page.getByRole('button',{name:'게시 검토 요청',exact:true}).click();await expect(page.locator('.badge')).toHaveText('게시 검토 대기');
     // Author cannot approve their own listing.
@@ -58,14 +58,14 @@ test('등록부터 독립 검토·양 기관 증빙·불일치 보류·대장 �
     await page.getByRole('button',{name:'인계 3개 확인',exact:true}).click();await toast(page,'증빙을 먼저 확인');await expect(page.locator('.badge')).toHaveText('예비 배정');
     const buyerReviewer=await actor('review2@demo.local');
     for(const [p,steps] of [[reviewer,['inquiry','agreement_sender','approval_sender']],[buyerReviewer,['agreement_receiver','approval_receiver']]] as [Page,string[]][]){
-      await p.goto('/'+casePath);await p.locator('.upload-control input').setInputFiles(attachment);await toast(p,'첨부파일을 저장');
+      await p.goto('/'+casePath);await p.locator('.upload-control input[type=file]').setInputFiles(attachment);await toast(p,'첨부파일을 저장');
       await p.getByLabel('우리 기관이 첨부한 증빙').selectOption({label:attachment.name});
       for(const step of steps){await p.getByLabel('확인할 단계').selectOption(step);await p.getByLabel('공식 처리번호·확인 근거').fill('합성근거-'+step);await p.getByRole('button',{name:'확인 근거 저장',exact:true}).click();await toast(p,'수동 확인 근거를 기록');}
     }
     // Actual CSV file import, preserving leading zeroes, then asset binding.
     await page.goto('/#/inventory');await expect(page.getByRole('heading',{name:'대장 가져오기·자산 연결',exact:true})).toBeVisible();
     const csv='\uFEFF자산번호,대장품명,수량,물품분류번호,물품식별번호\r\n00001234,합성 대장 의자,3,00123456,00005678\r\n';
-    await page.locator('input[type=file]').setInputFiles({name:'한글_검수대장.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+    await page.locator('input[type=file][accept*="csv"]').setInputFiles({name:'한글_검수대장.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
     await expect(page.getByText('한글_검수대장.csv · 1행')).toBeVisible();
     await page.getByRole('button',{name:'검증 후 원본 저장',exact:true}).click();await toast(page,'신규 1행');
     await page.getByLabel('00001234 선택').check();await page.getByLabel('연결할 묶음').selectOption(lotPath.split('/').pop()!);
@@ -97,19 +97,19 @@ test('부분 첨부 실패·HEIC 재시도·중복 CSV 열·CP949 실제 파일'
   await page.getByLabel('물품 이름 *',{exact:true}).fill('파일 오류 검수용 합성 초안');await page.getByRole('button',{name:'비공개 초안 저장',exact:true}).click();
   await expect(page).toHaveURL(/\/edit$/);
   const png=await sharp({create:{width:30,height:30,channels:3,background:'#eee'}}).png().toBuffer();
-  await page.locator('.upload-control input').nth(0).setInputFiles([{name:'저장성공.png',mimeType:'image/png',buffer:png},{name:'오류.heic',mimeType:'image/heic',buffer:Buffer.from('unsupported')}]);
-  await toast(page,'1개는 저장되었습니다');await expect(page.getByAltText('저장성공.png')).toBeVisible();await expect(page.locator('.toast')).toContainText('JPEG로 변환');
-  await page.locator('.upload-control input').nth(0).setInputFiles({name:'오류.heic',mimeType:'image/heic',buffer:Buffer.from('unsupported')});await toast(page,'JPEG로 변환');
+  await page.locator('.upload-control input[type=file]').nth(0).setInputFiles([{name:'저장성공.png',mimeType:'image/png',buffer:png},{name:'오류.heic',mimeType:'image/heic',buffer:Buffer.from('unsupported')}]);
+  await toast(page,'1개는 저장되었습니다');await expect(page.locator('.editor-photos').getByAltText('저장성공.png')).toBeVisible();await expect(page.locator('.toast')).toContainText('JPEG로 변환');
+  await page.locator('.upload-control input[type=file]').nth(0).setInputFiles({name:'오류.heic',mimeType:'image/heic',buffer:Buffer.from('unsupported')});await toast(page,'JPEG로 변환');
   const apiPath='/api'+new URL(page.url()).hash.slice(1).replace(/\/edit$/,'');
   const current=await (await page.request.get(apiPath)).json();const session=await (await page.request.get('/api/auth/me')).json();
   const changed=await page.request.put(apiPath,{headers:{Origin:new URL(page.url()).origin,'X-CSRF-Token':session.csrf},data:{...current.data,version:current.version,description:'다른 담당자가 먼저 저장한 합성 수정'}});expect(changed.ok()).toBeTruthy();
   await page.getByRole('button',{name:'비공개 초안 저장',exact:true}).click();await toast(page,'다른 담당자가 먼저 수정');await page.reload();await expect(page.getByRole('textbox',{name:'설명',exact:true})).toHaveValue('다른 담당자가 먼저 저장한 합성 수정');
   await page.getByRole('button',{name:'비공개 초안 저장',exact:true}).click();await toast(page,'초안을 저장');
   await page.goto('/#/inventory');await expect(page.getByRole('heading',{name:'대장 가져오기·자산 연결',exact:true})).toBeVisible();
-  await page.locator('input[type=file]').setInputFiles({name:'중복열.csv',mimeType:'text/csv',buffer:Buffer.from('자산번호,대장품명,수량,수량\r\n001,의자,1,2')});await toast(page,'중복 열 이름');await expect(page.getByRole('button',{name:'검증 후 원본 저장'})).toHaveCount(0);
+  await page.locator('input[type=file][accept*="csv"]').setInputFiles({name:'중복열.csv',mimeType:'text/csv',buffer:Buffer.from('자산번호,대장품명,수량,수량\r\n001,의자,1,2')});await toast(page,'중복 열 이름');await expect(page.getByRole('button',{name:'검증 후 원본 저장'})).toHaveCount(0);
   // CP949 bytes for 자산번호,대장품명,수량 / 00009999,합성 의자,2.
   const cp949=Buffer.from('wNq76rn4yKMstOvA5cewuO0svPa3rg0KMDAwMDk5OTksx9W8uiDAx8DaLDINCg==','base64');
-  await page.locator('input[type=file]').setInputFiles({name:'한글_CP949.csv',mimeType:'text/csv',buffer:cp949});
+  await page.locator('input[type=file][accept*="csv"]').setInputFiles({name:'한글_CP949.csv',mimeType:'text/csv',buffer:cp949});
   await expect(page.getByText('한글_CP949.csv · 1행')).toBeVisible();
   await expect(page.getByLabel(/^자산번호 \*/)).toHaveValue('자산번호');
   await page.getByRole('button',{name:'검증 후 원본 저장',exact:true}).click();await toast(page,'신규 1행');

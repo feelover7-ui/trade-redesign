@@ -2,6 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {migrateEnhancements} from './migrations.mjs';
 
 export const uid = () => randomUUID();
 export const now = () => new Date().toISOString();
@@ -31,10 +32,11 @@ export function openDatabase(file = resolve(process.env.DATA_DIR || './data', 't
   CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_events BEGIN SELECT RAISE(ABORT,'AUDIT_APPEND_ONLY'); END;
   CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_events BEGIN SELECT RAISE(ABORT,'AUDIT_APPEND_ONLY'); END;
   CREATE TRIGGER IF NOT EXISTS asset_snapshot_immutable BEFORE UPDATE OF snapshot,quantity,external_id,original_name ON assets BEGIN SELECT RAISE(ABORT,'ORIGINAL_ASSET_IMMUTABLE'); END;
-  PRAGMA user_version=1;`);
+  `);
+  migrateEnhancements(db);
   return db;
 }
-export function transaction(db, fn) { db.exec('BEGIN IMMEDIATE'); try {const result=fn(); db.exec('COMMIT'); return result;} catch(error) {db.exec('ROLLBACK'); throw error;} }
+export function transaction(db, fn) { const nested=db.isTransaction; const savepoint='sp_'+uid().replaceAll('-',''); db.exec(nested?`SAVEPOINT ${savepoint}`:'BEGIN IMMEDIATE'); try {const result=fn(); db.exec(nested?`RELEASE ${savepoint}`:'COMMIT'); return result;} catch(error) {db.exec(nested?`ROLLBACK TO ${savepoint}`:'ROLLBACK'); if(nested)db.exec(`RELEASE ${savepoint}`); throw error;} }
 export function audit(db, actor, action, entity, detail={}) {db.prepare('INSERT INTO audit_events VALUES(?,?,?,?,?,?,?)').run(uid(),actor.org_id,actor.id,action,entity,JSON.stringify(detail),now());}
 export function fail(message, status=400, code='VALIDATION_ERROR') {const e=new Error(message);e.status=status;e.code=code;throw e;}
 export function must(value,message,status=400,code='VALIDATION_ERROR') {if(!value) fail(message,status,code);}

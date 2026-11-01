@@ -1,3 +1,5 @@
+> **v0.4 최신 결과:** [V04_TEST_REPORT.md](V04_TEST_REPORT.md). 아래는 2026-10-31 기반 버전 검수 기록입니다.
+
 # MVP 검증 기록 — 2026-10-31
 
 ## NAS·Cloudflare 시연 배포 검증 — 최신
