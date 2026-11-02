@@ -6,7 +6,7 @@ import {DEEPSEEK_BASE,ragConfig,ready,boundedJson,generateGrounded} from '../ser
 const env=process.env,config=ragConfig(env);
 const kb=new KnowledgeBase({dir:env.RAG_CORPUS_DIR,libraryEnabled:env.RAG_LIBRARY_ENABLED==='true'});
 try{
- const status=kb.stats();console.log(JSON.stringify({...status,model:config.model,aiConfigured:ready(config)},null,2));
+ const status=kb.stats();console.log(JSON.stringify({...status,provider:config.provider,model:config.model,aiConfigured:ready(config)},null,2));
  if(env.RAG_LIBRARY_ENABLED==='true'){
   if(!status.libraryDocuments)throw new Error('지침 사용을 켰지만 읽을 수 있는 인덱스가 없습니다.');
   const manifestFile=resolve(env.RAG_CORPUS_DIR,'manifest.json');if(!existsSync(manifestFile))throw new Error('자료 manifest.json이 없습니다.');
@@ -18,10 +18,12 @@ try{
  }
  for(const [q,scope]of [['엑셀로 물품 등록','app'],['소요조회 15일 권장','library'],['관리전환 합의서 서식','library']])console.log(JSON.stringify({q,scope,results:kb.search(q,{scope,limit:3}).map(x=>({documentId:x.documentId,locator:x.locator,currentness:x.currentness}))}));
  if(process.argv.includes('--live')){
-  if(!ready(config))throw new Error('실호출에는 RAG_AI_ENABLED/RAG_EXTERNAL_APPROVED와 DEEPSEEK_API_KEY가 필요합니다.');
-  const models=await boundedJson(DEEPSEEK_BASE+'/models',{headers:{Authorization:`Bearer ${config.key}`}});
-  const found=models.data?.find(m=>m.id===config.model);if(!found)throw new Error('설정한 RAG_MODEL이 계정의 모델 목록에 없습니다. 자동 대체하지 않습니다.');
-  console.log(JSON.stringify({modelId:found.id,displayName:found.name||null}));
+  if(!ready(config))throw new Error('실호출에는 활성화·전송 승인과 선택 공급자의 서버 키·모델 설정이 필요합니다.');
+  if(config.provider==='deepseek'){
+   const models=await boundedJson(DEEPSEEK_BASE+'/models',{headers:{Authorization:`Bearer ${config.key}`}});
+   const found=models.data?.find(m=>m.id===config.model);if(!found)throw new Error('설정한 RAG_MODEL이 계정의 모델 목록에 없습니다. 자동 대체하지 않습니다.');
+   console.log(JSON.stringify({modelId:found.id,displayName:found.name||null}));
+  }else console.log('Hive: 공식 문서의 고정 모델 ID를 사용하며 아래 실제 completion 반환 ID로 검증합니다. 계정 모델 목록 API는 확인되지 않았습니다.');
   const answer=await generateGrounded({question:'엑셀로 물품을 어떻게 등록하나요?',sources:kb.search('엑셀 물품 등록',{scope:'app',limit:3}),config});
   if(!answer.sections.length)throw new Error('실호출은 응답했지만 인용 답변을 생성하지 못했습니다.');
   console.log(JSON.stringify({liveModel:answer.model,sections:answer.sections.length,usage:answer.usage,note:'공개 프로그램 안내만 전송. private 지침은 전송하지 않음.'},null,2));

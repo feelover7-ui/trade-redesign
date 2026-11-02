@@ -4,8 +4,10 @@ services:
   app:
     environment:
       RAG_AI_ENABLED: ${RAG_AI_ENABLED:-false}
+      RAG_PROVIDER: ${RAG_PROVIDER:-deepseek}
       RAG_MODEL: ${RAG_MODEL:-deepseek-flash}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      HIVE_API_KEY: ${HIVE_API_KEY:-}
       RAG_EXTERNAL_APPROVED: ${RAG_EXTERNAL_APPROVED:-false}
       RAG_DAILY_LIMIT: ${RAG_DAILY_LIMIT:-50}
       RAG_LIBRARY_ENABLED: ${RAG_LIBRARY_ENABLED:-false}
