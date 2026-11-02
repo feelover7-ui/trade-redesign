@@ -1,9 +1,8 @@
-/** Additive v2 migration; never rebuild or reset existing business tables. */
+/** Additive migrations; never rebuild or reset existing business tables. */
 export function migrateEnhancements(db) {
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
-  if(version>2)throw new Error('Database version is newer than this application. Do not downgrade.');
-  if(version===2)return;
-  db.exec(`BEGIN IMMEDIATE;
+  if(version>3)throw new Error('Database version is newer than this application. Do not downgrade.');
+  if(version<2)db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS import_batches(
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id),
       created_by TEXT NOT NULL REFERENCES users(id), file_hash TEXT NOT NULL,
@@ -36,4 +35,26 @@ export function migrateEnhancements(db) {
     CREATE INDEX IF NOT EXISTS idx_shipping_org ON shipping_quotes(org_id,created_at);
     PRAGMA user_version=2;
     COMMIT;`);
+  if(version<3){
+    db.exec('BEGIN IMMEDIATE');
+    try{
+      db.exec(`CREATE TABLE feedback(
+        id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id),
+        user_id TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL,
+        category TEXT NOT NULL CHECK(category IN ('FEATURE','BUG','USABILITY','OTHER')),
+        body TEXT NOT NULL, page TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'RECEIVED' CHECK(status IN ('RECEIVED','REVIEWING','DONE','DEFERRED')),
+        reply TEXT NOT NULL DEFAULT '', responded_by TEXT REFERENCES users(id),
+        request_key TEXT NOT NULL, payload_hash TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id,request_key));
+        CREATE TABLE feedback_attachments(
+          feedback_id TEXT NOT NULL REFERENCES feedback(id),
+          file_id TEXT PRIMARY KEY REFERENCES files(id),
+          UNIQUE(feedback_id,file_id));
+        CREATE INDEX idx_feedback_user ON feedback(user_id,created_at);
+        CREATE INDEX idx_feedback_status ON feedback(status,created_at);
+        PRAGMA user_version=3;`);
+      db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error;}
+  }
 }
