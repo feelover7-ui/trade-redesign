@@ -1,6 +1,6 @@
 # trade.h19h19.com NAS 배포
 
-사용자가 2026-10-31에 지정한 대상은 **NAS 볼륨2 + Cloudflare + trade.h19h19.com**이다. 기관 운영 승인은 없으므로 합성 자료 시연으로 구성하며 외부 API·AI는 미연결 상태를 유지한다. 이 문서는 배포 구성과 검증 절차이며, 실제 배포 성공 기록은 아래 결과에 별도로 남긴다.
+사용자가 2026-10-31에 지정한 대상은 **NAS 볼륨2 + Cloudflare + trade.h19h19.com**이다. 기관 운영 승인은 없으므로 합성 자료 시연으로 구성한다. 외부 API·AI의 실제 연결 상태는 아래 최신 배포 기록을 따른다.
 
 ## 데이터와 기존 서비스 보존
 
@@ -47,7 +47,15 @@ HTTPS 인증서·HTTP→HTTPS 전환, 로그인·로그아웃, Secure/HttpOnly/S
 
 문제가 있으면 새 `trade` 경로와 이 Compose 프로젝트만 중지하고 소스 릴리스·환경 경로를 이전 값으로 되돌린다. `down -v`, DB 삭제, `docker system prune`, 기존 서비스 전체 재시작은 사용하지 않는다.
 
-## v0.5.2 Hive DeepSeek 1017 연결 결과 — 2026-11-02
+## AI 답변 요청 동의 문구 제거 — 2026-11-02
+
+현재 배포 소스는 `a6de093827130bfb8a5d12f188629c40719f03e5`, 릴리스는 `/volume2/docker/trade/releases/a6de093`, 이미지는 `mulppum-ieum:a6de093`이다(이미지ID `sha256:3dcea824561566d46d806b1aa1ba7d8eb7a7cd99d106fc823bc9dca134862eca`). 사용자 요청으로 챗봇의 전송 동의 문구·체크박스를 제거했다. AI 답변 받기 버튼을 누를 때만 요청별 확인 플래그를 보내고, 근거 검색은 외부 AI를 호출하지 않는다. 서버의 인증·업무역할·CSRF·외부전송 승인·지침 공유·한도 검사는 유지한다.
+
+변경 전 기존 릴리스121개 파일이 배포 원본과 동일함을 확인했다. `/volume2/docker/trade/backups/2026-11-02T03-19-53Z-rag-direct-request-pre-v3`에 앱 중지 상태의 DB·첨부17개·계정7개와 호출한도DB를 백업하고 `/volume2/docker/trade/restore-checks/2026-11-02T03-19-53Z-rag-direct-request-pre-v3`에 별도 복원했다. 호출한도1행·3회와 해시/무결성을 대조하고 비공개 시험 서버에서 기존 물품·사진·상태배분·배송·개선사항/답변·파일 ACL을 확인했다. DB버전3·데이터 경로·키·모델·Cloudflare·HTTPS·포트·Docker 네트워크와 다른 컨테이너ID를 보존했으며 환경파일은 `TRADE_RELEASE`만 변경했다.
+
+서버83개·빌드·Chrome E2E14개를 통과했다. 추가 UI 검사는 공급자 테스트 더블로 검색과 명시적 AI 요청을 구분하고 오류에도 근거가 유지되는지 확인한다. 실제 공개 도메인의1440px/390px에서 문구·체크박스 부재와 질문 입력만으로 버튼 활성화를 확인하고, 체크박스 없이 요청한 결과 실제 `deepseek-ai/deepseek-v4.1-flash-1017` 답변을 받았다. 캡처도 직접 열어 확인했다. 검증 기록은 `/volume2/docker/trade/deployments/rag-direct-request-2026-11-02T03-19-53Z`에 비공개로 보존했다.
+
+## 이전 v0.5.2 Hive DeepSeek 1017 연결 결과 — 2026-11-02
 
 현재 [AI 업무도우미](https://trade.h19h19.com/#/assistant)는 사용자가 지정한 기존 OpenCode의 Hive 키로 실제 DeepSeek4.1 1017 답변을 제공한다. 키는 값 출력 없이 SSH stdin으로 서버에 전달하여 root 전용 환경파일에 저장했다. 원래 OpenCode/Codex의 모델·인증과 사진 AI 설정은 변경하지 않았다.
 

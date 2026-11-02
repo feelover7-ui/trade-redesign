@@ -2,9 +2,11 @@
 
 ## 2026-11-02 최신 상태 — Hive 1017 연결 완료
 
-현재 NAS 소스는 `919a706e14869c0ecfce9eee9dc45f160a0b52d7`(v0.5.2)이다. 사용자가 기존 OpenCode의 DeepSeek4.1 1017 키를 사용하도록 지시해 기존 Hive 키 파일을 읽기 전용으로 사용했고, NAS의 보호된 `.env.nas`에만 연결했다. 새 로그인이나 키 발급 없이 기존 키의 실제 API 응답으로 검증했다. OpenCode/Codex 자체 인증·모델·기존 사진 AI 설정은 바꾸지 않았다.
+현재 NAS 소스는 `a6de093827130bfb8a5d12f188629c40719f03e5`(v0.5.2)이다. 사용자가 기존 OpenCode의 DeepSeek4.1 1017 키를 사용하도록 지시해 기존 Hive 키 파일을 읽기 전용으로 사용했고, NAS의 보호된 `.env.nas`에만 연결했다. 새 로그인이나 키 발급 없이 기존 키의 실제 API 응답으로 검증했다. OpenCode/Codex 자체 인증·모델·기존 사진 AI 설정은 바꾸지 않았다.
 
 현재 `RAG_PROVIDER=hive`, `RAG_MODEL=deepseek-ai/deepseek-v4.1-flash-1017`, `RAG_AI_ENABLED=true`이며 서버의 `HIVE_API_KEY`를 사용한다. DeepSeek 직결 키와 혼용하거나 이전 기본값 `deepseek-flash`로 자동 교체하지 않는다. 공개 프로그램 안내9개만 서비스하며 기관 간 지침 공유는 계속 미확인이므로 `RAG_LIBRARY_ENABLED=false`를 유지한다. 실제20개 공개 안내 질문의 답변·근거 대조와 NAS `rag:check -- --live`, 데스크톱/모바일 실제 생성·후속 질문·출처/기능 이동을 확인했다. 아래 키 미제공 기록은 이전 시점이다. 최신 설정·백업복원·검사 한계는 [HIVE_RAG.md](HIVE_RAG.md), [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md), [RAG_TEST_REPORT.md](RAG_TEST_REPORT.md)를 먼저 읽는다.
+
+사용자 추가 요청으로 AI 전송 동의 문구·체크박스를 제거했다. AI 답변 받기 버튼을 직접 누를 때만 요청별 확인 플래그를 보내며 서버의 외부전송 승인·권한·CSRF·한도 검증은 유지한다. 공개 실제1017 응답과 체크박스 없이 요청하는 데스크톱/390px 화면을 확인했고 브라우저 검사는14개다.
 
 ## 2026-11-01 NAS 후속 상태
 
