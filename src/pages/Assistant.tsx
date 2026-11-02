@@ -30,7 +30,7 @@ function AnswerView({turn,index,onRetry,busy}:{turn:Turn;index:number;onRetry?:(
 }
 export default function Assistant(){
  const {data:status,loading,error,reload}=useResource<Status>('/rag/status');
- const [question,setQuestion]=useState(''),[scope,setScope]=useState('app'),[busy,setBusy]=useState(false),[pendingQuestion,setPendingQuestion]=useState(''),[problem,setProblem]=useState(''),[turns,setTurns]=useState<Turn[]>([]);
+ const [question,setQuestion]=useState(''),[scope,setScope]=useState('all'),[busy,setBusy]=useState(false),[pendingQuestion,setPendingQuestion]=useState(''),[problem,setProblem]=useState(''),[turns,setTurns]=useState<Turn[]>([]);
  const lock=useRef(false),libraryAvailable=(status?.libraryDocuments||0)>0;
  useEffect(()=>{const id=busy?'rag-pending':problem?'rag-request-error':turns.length?`rag-turn-${turns[turns.length-1].answer.requestId}`:null;if(id)document.getElementById(id)?.scrollIntoView({block:'start',behavior:'smooth'});},[busy,turns,problem]);
  const prompts=libraryAvailable?['엑셀로 물품을 어떻게 등록하나요?','다량 물품 상태를 쉽게 입력하려면?','소요조회 15일은 의무인가요?','관리전환 합의서 양식도 찾아줘']:['엑셀로 물품을 어떻게 등록하나요?','다량 물품 상태를 쉽게 입력하려면?','받기 신청 후 재고는 언제 예약되나요?','개선사항에 파일은 어떻게 첨부하나요?'];
@@ -52,7 +52,7 @@ export default function Assistant(){
   <PageHead title="AI 업무도우미" description="궁금한 내용을 질문하고 답변과 출처를 확인하세요." action={<MessageCircle size={32}/>}/>
   {loading?<Loading/>:error?<ErrorBox message={error} retry={reload}/>:<>
    <div className="rag-prompts">{prompts.map(q=><button className="button secondary compact" type="button" key={q} disabled={busy} onClick={()=>void ask(true,{question:q,scope:/소요조회|합의서/.test(q)?'library':'app'})}>{q}</button>)}</div>
-   <div className="rag-transcript" aria-label="대화 내역">{turns.map((t,i)=><AnswerView turn={t} index={i} key={t.answer.requestId} busy={busy} onRetry={i===turns.length-1&&t.answer.mode==='PROVIDER_ERROR'?()=>void ask(true,t):undefined}/>)}{busy?<article className="rag-turn" id="rag-pending"><div className="rag-question"><span>내 질문</span><p>{pendingQuestion}</p></div><p className="rag-answer" role="status">답변을 준비하고 있습니다.</p></article>:!turns.length?<div className="rag-empty"><BookOpen size={30}/><h2>무엇을 도와드릴까요?</h2><p>물품 등록·신청·인계·배송 등 사용 방법을 질문해 주세요.</p></div>:null}</div>
+   <div className="rag-transcript" aria-label="대화 내역">{turns.map((t,i)=><AnswerView turn={t} index={i} key={t.answer.requestId} busy={busy} onRetry={i===turns.length-1&&t.answer.mode==='PROVIDER_ERROR'?()=>void ask(true,t):undefined}/>)}{busy?<article className="rag-turn" id="rag-pending"><div className="rag-question"><span>내 질문</span><p>{pendingQuestion}</p></div><p className="rag-answer" role="status">답변을 준비하고 있습니다.</p></article>:!turns.length?<div className="rag-empty"><BookOpen size={30}/><h2>무엇을 도와드릴까요?</h2><p>물품 등록·신청·인계 방법이나 관련 지침을 질문해 주세요.</p></div>:null}</div>
    <form className="rag-composer" onSubmit={e=>{e.preventDefault();void ask(true);}}>
     {libraryAvailable?<Field label="검색 범위"><select value={scope} onChange={e=>setScope(e.target.value)} disabled={busy}><option value="app">프로그램 사용법</option><option value="library">법령·지침·서식 (제공판)</option><option value="all">모두</option></select></Field>:null}
     <Field label="업무 질문"><textarea rows={3} maxLength={1000} value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&e.nativeEvent.keyCode!==229){e.preventDefault();void ask(true);}}} placeholder="예: 물품을 등록하려면 어떻게 하나요?" required disabled={busy}/></Field>

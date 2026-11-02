@@ -1,5 +1,7 @@
 # 물품이음 v0.5 — 지침 RAG와 DeepSeek 업무도우미
 
+> **2026-11-02 v0.5.3 최신:** 현재 사이트의 시연 계정까지 지침 공유 승인이 확인됐습니다. 지침121문서/8,164구간과 프로그램 안내10개, 검색·근거 구성 개선 및 실제 모델 검수는 [RAG_QUALITY.md](RAG_QUALITY.md)를 먼저 읽으세요. 배포·복구 현황은 [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)의 최신 기록을 따릅니다. 아래 지침 미공유 기록은 이전 이력입니다.
+
 > **v0.5.2 추가:** 사용자가 기존 OpenCode에서 사용한 Hive의 `deepseek-ai/deepseek-v4.1-flash-1017` 연결을 별도 공급자 옵션으로 지원합니다. 기본 DeepSeek 직결 설정은 유지하며 서버 키·모델을 자동 대체하지 않습니다. 설정·검사·보존 조건은 [HIVE_RAG.md](HIVE_RAG.md), 실제 배포 결과는 [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)의 최신 기록을 먼저 확인하세요. 아래 키 미제공 기록은 이전 v0.5 시점입니다.
 
 > **2026-11-01 NAS 후속 검수:** `d6bd5c9faef0d19bdee8db582da87df1750400a8`을 기존 NAS에 반영했습니다. 자료팩121문서/8,164구간은 비공개 읽기 전용으로 설치했으며 기관 간 공유 미확인으로 서비스의 지침 검색·원본 접근은 꺼져 있습니다. 사용자가 DeepSeek 전송을 허용했지만 키는 미제공이므로 생성·계정 모델 확인·실제20개 답변 평가는 미완료입니다. 아래 구현 시점의 미배포 기록과 구분하세요. 최신 근거는 [RAG_TEST_REPORT.md](RAG_TEST_REPORT.md), [NAS_DEPLOYMENT.md](NAS_DEPLOYMENT.md)에 있습니다.

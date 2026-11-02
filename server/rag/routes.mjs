@@ -5,6 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {z} from 'zod';
 import {business} from '../service.mjs';
 import {KnowledgeBase} from './search.mjs';
+import {contextualQuestion} from './query.mjs';
 import {ragConfig,ready,generateGrounded} from './deepseek.mjs';
 const questionSchema=z.object({question:z.string().trim().min(2).max(1000),scope:z.enum(['all','app','library']).default('all'),generate:z.boolean().default(false),consent:z.boolean().default(false),history:z.array(z.string().max(1000)).max(4).default([])}).strict();
 const hash=x=>createHash('sha256').update(x).digest('hex');
@@ -17,8 +18,8 @@ export function mountRag(app,{dataDir,env=process.env,fetcher=fetch,knowledge}={
  app.get('/api/rag/status',gate,(req,res)=>res.json({...kb.stats(),aiConfigured:ready(config),provider:config.provider,model:config.model,libraryExternalApproved:config.libraryExternalApproved,historyStorage:'화면 메모리만; 서버 대화본문 저장 안함'}));
  app.post('/api/rag/ask',gate,async(req,res)=>{
   const d=questionSchema.parse(req.body),user=req.user;const now=Date.now(),last=windows.get(user.id);if(last&&now-last.start<60000&&last.n>=30)return res.status(429).json({error:'잠시 후 다시 검색하세요.'});if(windows.size>10000)for(const[k,v]of windows)if(now-v.start>60000)windows.delete(k);windows.set(user.id,last&&now-last.start<60000?{start:last.start,n:last.n+1}:{start:now,n:1});
-  const contextual=d.history.length&&(/그|이것|양식|서식|그럼|다음/.test(d.question)||d.question.length<14)?d.history.slice(-1).join(' ')+' '+d.question:d.question;
-  let sources=kb.search(contextual,{scope:d.scope,limit:8});
+  const contextual=contextualQuestion(d.question,d.history);
+  let sources=kb.evidence(contextual,{scope:d.scope,limit:8});
   const warnings=['지침은 제공판·현행성 미검증입니다. 금액·기간·예외는 원문과 현행 규정으로 확인하세요.','AI 답변은 행정 결재·법률 판단·대장 변경을 수행하지 않습니다.'];
   const base={requestId:randomUUID(),queryHash:hash(d.question),sections:[],sources:[],mode:'SEARCH_ONLY',model:null,warnings,needsReview:true};
   const label=items=>items.map((s,i)=>({...s,label:'S'+(i+1)}));
@@ -27,7 +28,7 @@ export function mountRag(app,{dataDir,env=process.env,fetcher=fetch,knowledge}={
   if(!d.consent)return res.status(400).json({error:'질문과 검색 근거를 딥시크에 보내는 데 동의해야 합니다.'});
   if(!ready(config))return res.json({...base,sources:label(sources),message:'딥시크 연결 또는 외부전송 승인이 없어 검색 근거만 표시합니다.'});
   if(!config.libraryExternalApproved&&sources.some(s=>s.source==='LIBRARY'))return res.json({...base,sources:label(sources),message:'지침 자료의 외부 전송 승인이 없어 AI 호출 없이 근거만 표시합니다. 프로그램 사용법은 프로그램 범위로 질문하세요.'});
-  sources=sources.slice(0,6);if(active.has(user.id))return res.status(429).json({error:'이전 AI 답변이 처리 중입니다.'});active.add(user.id);
+  if(active.has(user.id))return res.status(429).json({error:'이전 AI 답변이 처리 중입니다.'});active.add(user.id);
   try{budget(user);const answer=await generateGrounded({question:d.question,history:d.history,sources,config,fetcher});res.json({...base,...answer,sources:label(sources),mode:answer.sections.length?'GENERATED':'NO_EVIDENCE',message:answer.sections.length?'검색 근거를 사용한 딥시크 답변입니다. 출처 연결을 검증했으며 문장 의미의 완전한 정확성을 보장하지는 않습니다.':'제공된 근거만으로 답을 확정할 수 없습니다.'});}
   catch(e){res.json({...base,mode:'PROVIDER_ERROR',sources:label(sources),message:e.message||'AI 호출에 실패했습니다. 검색 근거는 유지됩니다.'});}finally{active.delete(user.id);}
  });

@@ -16,7 +16,7 @@ const good=()=>new Response(JSON.stringify({model:'deepseek-flash',choices:[{fin
 function corpus(t){const dir=mkdtempSync(join(tmpdir(),'trade-rag-corpus-'));mkdirSync(join(dir,'originals'));const bytes=Buffer.from('SYNTHETIC FORM FOR TEST ONLY');writeFileSync(join(dir,'originals','TEST.hwp'),bytes);const db=new DatabaseSync(join(dir,'index.sqlite'));db.exec(INDEX_SCHEMA);db.prepare('INSERT INTO documents VALUES(?,?,?,?,?,?,?,?,?)').run('TEST-001','관리전환 합의서 서식 테스트','TEMPLATE','UNVERIFIED_PROVIDED_EDITION','2020년 합성 자료','합성서식.hwp','TEST.hwp',digest(bytes),'{}');db.prepare('INSERT INTO chunks VALUES(?,?,?,?,?,?,?)').run('TEST-001-C1','TEST-001','원문 표001',10,14,'관리전환 합의서 서식입니다. 이 테스트 자료는 제공판이며 실제 현행 법령이 아닙니다. 담당자가 대상과 합의 조건을 확인합니다.','CONVERTED');db.prepare('INSERT INTO search(id,title,body,grams) VALUES(?,?,?,?)').run('TEST-001-C1','관리전환 합의서 서식 테스트','관리전환 합의서 서식 담당자 확인',grams('관리전환 합의서 서식 담당자 확인'));db.close();t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir;}
 async function http(t,{env={},fetcher=async()=>{throw new Error('NO_NETWORK_IN_TEST');}}={}){const f=fixture(),dir=mkdtempSync(join(tmpdir(),'trade-rag-http-')),origin='http://localhost:4310';const app=createApp(f.db,{dataDir:dir,origin,rag:{env,fetcher}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base='http://127.0.0.1:'+server.address().port;t.after(async()=>{await new Promise(r=>server.close(r));app.locals.closeRag();f.db.close();rmSync(dir,{recursive:true,force:true});});const login=async(email='editor@test.local')=>{const r=await fetch(base+'/api/auth/login',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({email,password:'TestingPassword!26'})});const j=await r.json();return {Cookie:r.headers.get('set-cookie').split(';')[0],Origin:origin,'X-CSRF-Token':j.csrf,'Content-Type':'application/json'};};return {...f,base,app,login};}
 const ask=(base,headers,data)=>fetch(base+'/api/rag/ask',{method:'POST',headers,body:JSON.stringify(data)});
-test('RAG 사용법 검색은 한국어와 프로그램 근거·기능 경로를 반환',()=>{const k=new KnowledgeBase();try{const r=k.search('엑셀로 물품을 등록하려면 어떻게 하나요?',{scope:'app'});assert.equal(r[0].documentId,'APP-REGISTER');assert.equal(r[0].route,'/new');assert.ok(r.every(x=>x.kind==='APP'));assert.equal(k.stats().appDocuments,9);assert.deepEqual(k.search('화성 토성 여행날짜'),[]);}finally{k.close();}});
+test('RAG 사용법 검색은 한국어와 프로그램 근거·기능 경로를 반환',()=>{const k=new KnowledgeBase();try{const r=k.search('엑셀로 물품을 등록하려면 어떻게 하나요?',{scope:'app'});assert.equal(r[0].documentId,'APP-REGISTER');assert.equal(r[0].route,'/new');assert.ok(r.every(x=>x.kind==='APP'));assert.equal(k.stats().appDocuments,10);assert.deepEqual(k.search('화성 토성 여행날짜'),[]);}finally{k.close();}});
 test('RAG 지침 설정 전 검색·구절·원본 모두 비노출, 설정 후 제공판 표시',t=>{const dir=corpus(t),off=new KnowledgeBase({dir,libraryEnabled:false}),on=new KnowledgeBase({dir,libraryEnabled:true});try{assert.equal(off.stats().libraryDocuments,0);assert.equal(off.chunk('TEST-001-C1'),null);assert.equal(off.document('TEST-001'),null);assert.deepEqual(off.search('관리전환 합의서',{scope:'library'}),[]);const s=on.search('관리전환 합의서',{scope:'library'})[0];assert.equal(s.documentId,'TEST-001');assert.equal(s.lineStart,10);assert.equal(s.currentness,'UNVERIFIED_PROVIDED_EDITION');assert.equal(s.originalAvailable,true);}finally{off.close();on.close();}});
 test('RAG 누락·잘못된 인덱스는 비어있는 새 DB를 만들지 않음',t=>{const dir=mkdtempSync(join(tmpdir(),'rag-missing-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const k=new KnowledgeBase({dir,libraryEnabled:true});try{assert.match(k.stats().warning,/설치되지/);assert.equal(k.library,null);}finally{k.close();}});
 test('RAG 원문 경로 이탈과 심볼릭 링크 차단',t=>{const dir=corpus(t);writeFileSync(join(dir,'private.txt'),'outside');symlinkSync(join(dir,'private.txt'),join(dir,'originals','escape.hwp'));const k=new KnowledgeBase({dir,libraryEnabled:true});try{assert.equal(k.originalPath('../private.txt'),null);assert.equal(k.originalPath('escape.hwp'),null);assert.ok(k.originalPath('TEST.hwp'));}finally{k.close();}});
@@ -56,3 +56,56 @@ test('RAG 동의 없이 외부 전송 금지·기관 일일 한도·업무DB 무
 test('RAG 원문 다운로드는 로그인·승인·파일 무결성을 요구',async t=>{const dir=corpus(t);const h=await http(t,{env:{RAG_LIBRARY_ENABLED:'true',RAG_CORPUS_DIR:dir}}),e=await h.login();const url=h.base+'/api/rag/documents/TEST-001/original';assert.equal((await fetch(url)).status,401);let r=await fetch(url,{headers:e});assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/attachment/);assert.match(r.headers.get('content-disposition'),/UTF-8/);assert.equal(await r.text(),'SYNTHETIC FORM FOR TEST ONLY');writeFileSync(join(dir,'originals','TEST.hwp'),'tampered');assert.equal((await fetch(url,{headers:e})).status,409);});
 test('RAG 지침 외부전송 별도 미승인시 키가 있어도 검색만 제공',async t=>{const dir=corpus(t);let calls=0;const h=await http(t,{env:{...enabled,RAG_LIBRARY_ENABLED:'true',RAG_CORPUS_DIR:dir},fetcher:async()=>{calls++;return good();}}),e=await h.login();const r=await(await ask(h.base,e,{question:'관리전환 합의서 양식',scope:'library',generate:true,consent:true})).json();assert.equal(r.mode,'SEARCH_ONLY');assert.match(r.message,/외부 전송 승인/);assert.equal(r.sources[0].documentId,'TEST-001');assert.equal(calls,0);});
 test('RAG 공급자 인증 오류는 검색 근거 유지·키 미노출',async t=>{const h=await http(t,{env:enabled,fetcher:async()=>new Response(fakeKey,{status:401})}),e=await h.login();const r=await(await ask(h.base,e,{question:'엑셀 등록',scope:'app',generate:true,consent:true})).json();assert.equal(r.mode,'PROVIDER_ERROR');assert.ok(r.sources.length);assert.equal(JSON.stringify(r).includes(fakeKey),false);});
+
+test('일상 표현·기관 이름만인 무관 질문과 계정 안내를 구분',()=>{
+ const k=new KnowledgeBase();try{
+  for(const [q,id]of [['재고가 언제 줄어요?','APP-TRANSFER'],['사용감 있는 의자를 묶어서 나누고 싶어요','APP-BULK'],['로그인이 안 돼요','APP-ACCOUNT'],['엑셀로 등록하려고요','APP-REGISTER']])assert.equal(k.search(q)[0].documentId,id,q);
+  for(const q of ['서울 날씨','학교 근처 점심 추천','그룹으로 화성 여행'])assert.deepEqual(k.search(q),[],q);
+ }finally{k.close();}
+});
+test('후속 질문은 명시적 지시어만 연결하고 새 질문을 먼저 보존',async()=>{
+ const {contextualQuestion}=await import('../server/rag/query.mjs');
+ assert.equal(contextualQuestion('그럼 예외는요?',['소요조회 기간은?']),'그럼 예외는요? 소요조회 기간은?');
+ assert.equal(contextualQuestion('그룹 수량 입력은?',['소요조회 기간은?']),'그룹 수량 입력은?');
+ assert.equal(contextualQuestion('관리전환 합의서 서식 어디 있어요?',['배송비 계산은?']),'관리전환 합의서 서식 어디 있어요?');
+ assert.equal(contextualQuestion('로그인이 안 돼요',['소요조회 기간은?']),'로그인이 안 돼요');
+ assert.ok(contextualQuestion('그 서식은요?',['가'.repeat(1000)]).length<340);
+});
+test('법령 검색은 설계 참고를 제외하고 앱 의도는 사용법을 우선',t=>{
+ const dir=corpus(t),db=new DatabaseSync(join(dir,'index.sqlite'));
+ db.prepare('INSERT INTO documents VALUES(?,?,?,?,?,?,?,?,?)').run('TEST-DESIGN','관리전환 합의서 설계','DESIGN','UNVERIFIED_PROVIDED_EDITION','합성 테스트','','','','{}');
+ db.prepare('INSERT INTO chunks VALUES(?,?,?,?,?,?,?)').run('TEST-DESIGN-1','TEST-DESIGN','설계',1,3,'관리전환 합의서 법령 서식 제안','AUTHORED');
+ db.prepare('INSERT INTO search(id,title,body,grams) VALUES(?,?,?,?)').run('TEST-DESIGN-1','관리전환 합의서 설계','관리전환 합의서 법령 서식 제안',grams('관리전환 합의서 법령 서식 제안'));db.close();
+ const k=new KnowledgeBase({dir,libraryEnabled:true});try{
+  assert.ok(k.search('관리전환 합의서 법령 서식').every(s=>s.kind!=='DESIGN'));
+  assert.ok(k.search('관리전환 합의서 설계',{scope:'library'}).some(s=>s.kind==='DESIGN'));
+  assert.equal(k.search('엑셀로 등록하려고요')[0].documentId,'APP-REGISTER');
+  assert.ok(k.search('로그인이 안 돼요').every(s=>s.source==='APP'));
+ }finally{k.close();}
+});
+test('인접 표 구절은 실제 ID·행번호를 보존하고 수·크기·공유 경계를 지킴',t=>{
+ const dir=corpus(t),db=new DatabaseSync(join(dir,'index.sqlite'));
+ for(const [id,start,end,text]of [['TEST-001-C2',15,18,'단, 합의 조건 예외는 원문 담당자가 확인합니다.'],['TEST-001-FAR',200,205,'멀리 떨어진 무관한 구절']]){
+  db.prepare('INSERT INTO chunks VALUES(?,?,?,?,?,?,?)').run(id,'TEST-001','원문 표001',start,end,text,'CONVERTED');
+  db.prepare('INSERT INTO search(id,title,body,grams) VALUES(?,?,?,?)').run(id,'관리전환 합의서 서식 테스트',text,grams(text));
+ }db.close();
+ const k=new KnowledgeBase({dir,libraryEnabled:true}),off=new KnowledgeBase({dir});try{
+  const r=k.evidence('관리전환 합의서 서식',{scope:'library'});
+  assert.ok(r.some(s=>s.id==='TEST-001-C2'&&s.lineStart===15&&s.lineEnd===18));assert.equal(new Set(r.map(s=>s.id)).size,r.length);
+  assert.ok(k.evidence('관리전환 합의서',{scope:'library',limit:2}).length<=2);
+  assert.ok(k.evidence('관리전환 합의서',{maxChars:100}).reduce((n,s)=>n+s.text.length,0)<=100);
+  assert.deepEqual(off.evidence('관리전환 합의서',{scope:'library'}),[]);
+ }finally{k.close();off.close();}
+});
+
+test('같은 문서에서 표지보다 실제 조건 본문을 우선하고 원본 연결 정보를 모델에 전달',async t=>{
+ const dir=corpus(t),db=new DatabaseSync(join(dir,'index.sqlite'));
+ db.prepare('INSERT INTO chunks VALUES(?,?,?,?,?,?,?)').run('TEST-001-COVER','TEST-001','표지',1,3,'관리전환 합의서 서식 테스트','CONVERTED');
+ db.prepare('INSERT INTO search(id,title,body,grams) VALUES(?,?,?,?)').run('TEST-001-COVER','관리전환 합의서 서식 테스트','관리전환 합의서 서식 테스트',grams('관리전환 합의서 서식 테스트'));db.close();
+ const k=new KnowledgeBase({dir,libraryEnabled:true});try{
+  const sources=k.evidence('관리전환 합의서 조건 확인',{scope:'library'});assert.equal(sources[0].id,'TEST-001-C1');
+  await generateGrounded({question:'그 서식 원본 받을 수 있나요?',sources,config:ragConfig(enabled),fetcher:async(url,opts)=>{
+   const src=JSON.parse(JSON.parse(opts.body).messages[1].content).sources[0];assert.equal(src.originalAvailable,true);assert.equal(src.originalName,'합성서식.hwp');return good();
+  }});
+ }finally{k.close();}
+});
