@@ -47,9 +47,42 @@ HTTPS 인증서·HTTP→HTTPS 전환, 로그인·로그아웃, Secure/HttpOnly/S
 
 문제가 있으면 새 `trade` 경로와 이 Compose 프로젝트만 중지하고 소스 릴리스·환경 경로를 이전 값으로 되돌린다. `down -v`, DB 삭제, `docker system prune`, 기존 서비스 전체 재시작은 사용하지 않는다.
 
-## v0.5.1 개선사항 보존 업데이트 결과 — 2026-11-02
+## v0.5.2 Hive DeepSeek 1017 연결 결과 — 2026-11-02
 
-**현재 앱은 [https://trade.h19h19.com](https://trade.h19h19.com)의 v0.5.1**이다. [개선사항](https://trade.h19h19.com/#/feedback) 메뉴에서 의견과 사진·파일을 접수하며 모바일은 `더보기 → 개선사항`으로 접근한다. 작성자와 운영관리자만 조회하고 관리자가 처리 상태·답변을 기록한다. 첨부는 최대5개·각8MB이며 기존 업무 파일 권한은 확대하지 않았다.
+현재 [AI 업무도우미](https://trade.h19h19.com/#/assistant)는 사용자가 지정한 기존 OpenCode의 Hive 키로 실제 DeepSeek4.1 1017 답변을 제공한다. 키는 값 출력 없이 SSH stdin으로 서버에 전달하여 root 전용 환경파일에 저장했다. 원래 OpenCode/Codex의 모델·인증과 사진 AI 설정은 변경하지 않았다.
+
+| 항목 | 실제 구성 |
+|---|---|
+| 배포 소스 / 릴리스 | `919a706e14869c0ecfce9eee9dc45f160a0b52d7` / `/volume2/docker/trade/releases/919a706` (`current`) |
+| 앱 / 이미지 | `mulppum-ieum-app-1` / `mulppum-ieum:919a706` |
+| 이미지 ID | `sha256:933743db764b43c440ae5a65ee78481210dd71aadef7aaedba44547dcdfbaebc` |
+| 실제 공급자 / 반환 모델 | Hive / `deepseek-ai/deepseek-v4.1-flash-1017` |
+| 서버 비밀환경 | `/volume2/docker/trade/.env.nas` (root/0600), `RAG_PROVIDER=hive`, `HIVE_API_KEY` 사용 |
+| DB / 첨부 / 호출 한도 | 기존 `/volume2/docker/trade/demo-data/trade.sqlite`, `uploads/`, 별도 `rag-usage.sqlite` |
+| 공개 검색 / 비공개 자료 | 프로그램 안내9개·지침0개 / 121문서·8,164구간과129개 파일은 이전 버전 경로/읽기 전용 유지 |
+| 검증 기록 | `/volume2/docker/trade/deployments/hive-2026-11-02T02-51-56Z` (root 전용) |
+
+이전과 같은 세 Compose 파일을 사용하며 `nas.rag.compose.yml`에 공급자·Hive 키 환경변수만 추가했다. 호스트 loopback14310, HTTPS/Secure 쿠키, Cloudflare 설정/커넥터·Docker 네트워크ID와 다른 기존 컨테이너ID를 유지했다. 환경파일 변경 항목은 `TRADE_RELEASE`, `RAG_PROVIDER`, `RAG_MODEL`, `RAG_AI_ENABLED`, `HIVE_API_KEY` 다섯 가지다. 비공개 지침 공유는 계속 false다.
+
+### 백업·복원·검수
+
+| 단계 | 백업 / 새 복원 경로 |
+|---|---|
+| 교체 전 검수 | `/volume2/docker/trade/backups/2026-11-02T02-55-34Z-hive-pre-v3` / `/volume2/docker/trade/restore-checks/2026-11-02T02-55-34Z-hive-pre-v3` |
+| 최종 교체 직전 | `/volume2/docker/trade/backups/2026-11-02T03-05-21Z-hive-final-cutover-v3` / `/volume2/docker/trade/restore-checks/2026-11-02T03-05-21Z-hive-final-cutover-v3` |
+| 실제 답변 후 | `/volume2/docker/trade/backups/2026-11-02T03-11-34Z-hive-post-v3` / `/volume2/docker/trade/restore-checks/2026-11-02T03-11-34Z-hive-post-v3` |
+
+앱만 중지한 일관된 DB·uploads 백업과 SHA-256·SQLite 무결성 검사를 수행했다. DB버전3을 유지하며 최종 교체 전후 기존21개 테이블 전체 행 해시가 같았다. 교체 후 첨부17개·계정7개와 기존 물품·사진·상태배분·배송 예상·개선사항/답변/파일 ACL을 별도 `--network none` 시험 서버에서 복원 검수했다. 시험 컨테이너만 제거하고 사본은 보존했다.
+
+실제 UI 생성으로 만든 `rag-usage.sqlite`는 기본 backup/restore 스크립트 대상이 아니므로 앱 중지 중 SQLite backup으로 별도 저장했다. 위 post 백업의 `rag-usage.sqlite`와 `rag-usage-manifest.json`을 새 복원 경로에도 연결해 무결성·파일 해시·행을 대조했다(기관/일자1행, 호출3회). **복구할 때 기본 restore만 실행한 뒤 끝내지 말고, 같은 시점의 사용량DB도 별도로 무결성·해시 검증 후 새 경로에 복사한다.** 대화본문은 이 DB에 저장하지 않는다.
+
+macOS/NAS 서버83개·빌드, Chrome13개, `rag:check -- --live`, 공개 안내20개 실제 답변/출처 대조와1440px/390px 직접 조작을 확인했다. 초기 답변의 예약 설명을 보완하고 재검수했으며, 공급자 형식 오류1건은 성공 처리하지 않고 거부한 후 수동 재요청했다. 상세 결과와 한계는 [RAG_TEST_REPORT.md](RAG_TEST_REPORT.md)를 따른다.
+
+초기 교체 확인의 고정 health 버전 문제로 이전 소스/환경에 자동 복귀한 기록과 백업도 보존했다. 최종 health는0.5.2다. 이 변경에는 DB 마이그레이션이 없으므로 같은 v3 DB를 유지한 채 보호된 이전 환경파일과 `8c71c76` 소스로 복귀할 수 있다. 복귀 전에는 신규 DB·첨부·호출한도를 별도로 백업한다. corpus와 기존 데이터를 덮어쓰지 않는다. 기관 정식 운영·지침 공유·별도 저장소 재해복구 승인은 포함하지 않는다.
+
+## 이전 v0.5.1 개선사항 보존 업데이트 결과 — 2026-11-02
+
+당시 [https://trade.h19h19.com](https://trade.h19h19.com)에 v0.5.1을 반영했다. [개선사항](https://trade.h19h19.com/#/feedback) 메뉴에서 의견과 사진·파일을 접수하며 모바일은 `더보기 → 개선사항`으로 접근한다. 작성자와 운영관리자만 조회하고 관리자가 처리 상태·답변을 기록한다. 첨부는 최대5개·각8MB이며 기존 업무 파일 권한은 확대하지 않았다.
 
 | 항목 | 실제 구성 |
 |---|---|
