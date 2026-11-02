@@ -47,9 +47,49 @@ HTTPS 인증서·HTTP→HTTPS 전환, 로그인·로그아웃, Secure/HttpOnly/S
 
 문제가 있으면 새 `trade` 경로와 이 Compose 프로젝트만 중지하고 소스 릴리스·환경 경로를 이전 값으로 되돌린다. `down -v`, DB 삭제, `docker system prune`, 기존 서비스 전체 재시작은 사용하지 않는다.
 
-## v0.5 RAG 보존 업데이트 결과 — 2026-11-01
+## v0.5.1 개선사항 보존 업데이트 결과 — 2026-11-02
 
-**현재 앱은 [https://trade.h19h19.com](https://trade.h19h19.com)의 v0.5.0**이며 실제 배포 소스는 `d6bd5c9faef0d19bdee8db582da87df1750400a8`입니다. 앱 코드를 수정하지 않고 지정된 main 커밋 그대로 NAS에서 빌드·반영했습니다. 이전 v0.4 검수 문서가 main에 합쳐지지 않았으므로 이 문서에 해당 이력도 보존했습니다.
+**현재 앱은 [https://trade.h19h19.com](https://trade.h19h19.com)의 v0.5.1**이다. [개선사항](https://trade.h19h19.com/#/feedback) 메뉴에서 의견과 사진·파일을 접수하며 모바일은 `더보기 → 개선사항`으로 접근한다. 작성자와 운영관리자만 조회하고 관리자가 처리 상태·답변을 기록한다. 첨부는 최대5개·각8MB이며 기존 업무 파일 권한은 확대하지 않았다.
+
+| 항목 | 실제 구성 |
+|---|---|
+| 배포 소스 | `8c71c76dcb5c0585b3ee42e0209c6c254fe23dad` (`codex/feedback-tab`) |
+| 현재 릴리스 | `/volume2/docker/trade/releases/8c71c76dcb5c0585b3ee42e0209c6c254fe23dad` (`current` 링크) |
+| 앱 / 이미지 | `mulppum-ieum-app-1` / `mulppum-ieum:8c71c76` |
+| 이미지 ID | `sha256:a09672e80d8bfe36b838fa4ee2f7941845242bb86fd7a86b1dcedeb7e7744cde` |
+| DB / 첨부 | `/volume2/docker/trade/demo-data/trade.sqlite` / 같은 경로 `uploads/` (기존 경로 유지) |
+| DB 버전 | `user_version=3` (v2에 개선사항 테이블2개만 추가) |
+| 포트 / 네트워크 | `127.0.0.1:14310 → 4310`, 기존 `mulppum-ieum_default`·`10.253.43.0/28` 유지 |
+| 지침 연결 | 이전 v0.5 버전 경로와 `/app/rag-private` 읽기 전용 연결 유지, 129개 파일 동일 |
+| 서비스 검색 / AI | 프로그램 안내9개·지침0개 / DeepSeek·사진 AI 기존 설정 유지 |
+| 검증 기록 | `/volume2/docker/trade/deployments/feedback-2026-11-02T01-17-44Z/` |
+
+기존 DB·계정·미커밋 변경·포트·서비스를 먼저 확인한 뒤 Git archive 소스만 빌드했다. 자료팩·검색DB·개선사항·첨부·키는 이미지나 공개 저장소에 포함하지 않았다. 다른 컨테이너65개의 ID, 기존 Docker network ID, Cloudflare 라우팅 SHA-256과 터널 커넥터를 유지했고 `.env.nas`는 `TRADE_RELEASE`만 변경했다. HTTPS·Secure 쿠키와 loopback 포트·데이터 경로도 유지한다.
+
+### 일관된 백업·마이그레이션·복원
+
+각 백업은 앱만 중지한 상태에서 DB+uploads를 함께 저장하고 무결성·파일 해시를 검사했다. 아래 경로와 원본을 모두 보존했다.
+
+| 단계 | 백업 / 별도 복원 경로 |
+|---|---|
+| 교체 전 v2 | `/volume2/docker/trade/backups/2026-11-02T01-17-44Z-feedback-v2` / `/volume2/docker/trade/restore-checks/2026-11-02T01-17-44Z-feedback-v2` |
+| 별도 v3 마이그레이션 | 위 백업 → `/volume2/docker/trade/restore-checks/2026-11-02T01-17-44Z-feedback-v2-migrated-v3` |
+| 실제 교체 직전 v2 | `/volume2/docker/trade/backups/2026-11-02T01-30-59Z-feedback-cutover-v2` / `/volume2/docker/trade/restore-checks/2026-11-02T01-30-59Z-feedback-cutover-v2` |
+| 교체 후 v3 | `/volume2/docker/trade/backups/2026-11-02T01-37-58Z-feedback-post-v3` / `/volume2/docker/trade/restore-checks/2026-11-02T01-37-58Z-feedback-post-v3` |
+
+구버전 복원 사본에서 로그인·기존 자료·사진·80개 상태배분·배송 예상 기록을 검사했다. 별도 사본 및 실제 DB의 v2→v3 전후 **기존19개 테이블 전체 행 해시가 일치**했고 재오픈은 멱등이었다. 계정7개·기존 첨부15개를 보존했다. 교체 후 **첨부17개**를 포함한 v3 백업을 새 경로에 복원하여 기존 자료와 신규 의견의 처리완료 상태·관리자 답변·첨부2개·작성자 접근·타기관 차단을 확인했다. 실제 앱 재시작 후 같은 신규 의견과 원본 자료를 확인했다. 시험 컨테이너만 제거하고 모든 백업·복원 사본은 유지했다.
+
+**v3 원본에 v0.5 구버전을 직접 실행하지 않는다.** 먼저 앱만 중지하고 v3 DB·uploads·새 의견을 별도 보존한다. 위 검증된 v2 백업을 **새 DATA_DIR**로 복원한 뒤 이전 `d6bd5c9` 릴리스/이미지와 환경을 사용한다. 신규 v3 의견은 v2 백업에 없으므로 별도 대조·보존이 필요하다. 기존 원본을 덮어쓰거나 DB 버전 숫자만 내리는 복구는 사용하지 않는다.
+
+### 실제 화면·권한 검사
+
+Node24/macOS·NAS Linux Docker에서 서버80개·빌드, 최종 Chrome E2E13개를 통과했고 알려진 npm 취약점은0건이었다. 실제 도메인의 1440px/390px 화면에서 의견·사진·TXT 접수와 다운로드, 관리자 상태·답변, 작성자의 결과 조회를 직접 확인했다. 동일기관 다른 사용자와 타기관은 의견·첨부를 읽을 수 없고 기존 업무 파일 ACL도 유지했다. 한글 파일명·이미지 EXIF 제거·미인증401·CSRF403·no-store를 확인했다. 상세 결과는 [FEEDBACK.md](FEEDBACK.md)에 기록했다.
+
+기관 운영 승인 전 **합성 시연** 상태다. 지침 공유 미확인·DeepSeek 키 미제공에 따른 비활성 설정을 유지했으며 기존 사진 AI·Codex 모델/인증은 변경하지 않았다. 같은 NAS 안의 백업·복원을 검증했으며 NAS 전체 장애용 별도 저장소 백업은 여전히 후속 설정이다.
+
+## 이전 v0.5 RAG 보존 업데이트 결과 — 2026-11-01
+
+당시 [https://trade.h19h19.com](https://trade.h19h19.com)에 반영한 v0.5.0의 실제 배포 소스는 `d6bd5c9faef0d19bdee8db582da87df1750400a8`입니다. 앱 코드를 수정하지 않고 지정된 main 커밋 그대로 NAS에서 빌드·반영했습니다. 이전 v0.4 검수 문서가 main에 합쳐지지 않았으므로 이 문서에 해당 이력도 보존했습니다.
 
 | 항목 | 실제 구성 |
 |---|---|
