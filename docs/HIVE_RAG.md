@@ -14,7 +14,7 @@ RAG_EXTERNAL_APPROVED=true
 RAG_LIBRARY_ENABLED=false
 ```
 
-`HIVE_API_KEY`와 `DEEPSEEK_API_KEY`는 별개다. Hive 모드에서 직결 키를 대신 보내지 않고, 다른 공급자/모델로 자동 대체하지 않는다. 고정 공식 주소 `https://api-cdn.thehive.ai/api/v3/chat/completions`에만 전송하며 `reasoning_effort=none`, JSON 응답, 출력2600토큰·60초·256KB 제한을 사용한다. 반환 모델이 지정한1017 모델과 다르면 답변을 거부한다. 본문·인용ID 검증과 인증·업무역할·CSRF·사용자 동의·일일 기관 한도를 그대로 적용한다. 화면에 Hive 공급자를 표시한다.
+`HIVE_API_KEY`와 `DEEPSEEK_API_KEY`는 별개다. Hive 모드에서 직결 키를 대신 보내지 않고, 다른 공급자/모델로 자동 대체하지 않는다. 고정 공식 주소 `https://api-cdn.thehive.ai/api/v3/chat/completions`에만 전송하며 `reasoning_effort=none`, JSON 응답, 출력2600토큰·60초·256KB 제한을 사용한다. 반환 모델이 지정한1017 모델과 다르면 답변을 거부한다. 본문·인용ID 검증과 인증·업무역할·CSRF·일일 기관 한도를 그대로 적용한다. 별도 전송 동의 문구·체크박스는 사용자 요청으로 제거했다. 사용자가 AI 답변 받기를 직접 누를 때만 요청별 `consent=true`를 보내며, 근거 검색은 `generate=false, consent=false`로 외부 AI를 호출하지 않는다. 서버의 요청별 확인과 환경의 외부전송·지침 공유 승인 검증은 유지한다. 화면에 Hive 공급자를 표시한다.
 
 공식 Hive 모델 목록 문서에는 고정 모델 ID가 있지만 계정의 `GET /models` API는 확인되지 않았다. 임의 주소나 목록 응답을 만들지 않는다. `npm run rag:check -- --live`는 Hive 모드에서 공개 프로그램 안내로 실제 completion을 호출하고 반환 모델 ID·JSON 인용 답변을 검증한다. DeepSeek 직결은 기존 공식 `/models` 확인을 유지한다.
 
