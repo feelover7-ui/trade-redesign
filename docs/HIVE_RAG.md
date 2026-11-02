@@ -14,7 +14,7 @@ RAG_EXTERNAL_APPROVED=true
 RAG_LIBRARY_ENABLED=false
 ```
 
-`HIVE_API_KEY`와 `DEEPSEEK_API_KEY`는 별개다. Hive 모드에서 직결 키를 대신 보내지 않고, 다른 공급자/모델로 자동 대체하지 않는다. 고정 공식 주소 `https://api-cdn.thehive.ai/api/v3/chat/completions`에만 전송하며 `reasoning_effort=none`, JSON 응답, 출력2600토큰·60초·256KB 제한을 사용한다. 반환 모델이 지정한1017 모델과 다르면 답변을 거부한다. 본문·인용ID 검증과 인증·업무역할·CSRF·일일 기관 한도를 그대로 적용한다. 별도 전송 동의 문구·체크박스는 사용자 요청으로 제거했다. 사용자가 AI 답변 받기를 직접 누를 때만 요청별 `consent=true`를 보내며, 근거 검색은 `generate=false, consent=false`로 외부 AI를 호출하지 않는다. 서버의 요청별 확인과 환경의 외부전송·지침 공유 승인 검증은 유지한다. 화면에 Hive 공급자를 표시한다.
+`HIVE_API_KEY`와 `DEEPSEEK_API_KEY`는 별개다. Hive 모드에서 직결 키를 대신 보내지 않고, 다른 공급자/모델로 자동 대체하지 않는다. 고정 공식 주소 `https://api-cdn.thehive.ai/api/v3/chat/completions`에만 전송하며 `reasoning_effort=none`, JSON 응답, 출력2600토큰·60초·256KB 제한을 사용한다. 반환 모델이 지정한1017 모델과 다르면 답변을 거부한다. 본문·인용ID 검증과 인증·업무역할·CSRF·일일 기관 한도를 그대로 적용한다. 별도 전송 동의 문구·체크박스는 사용자 요청으로 제거했다. 사용자가 Enter 또는 답변 받기로 명시적으로 전송할 때만 요청별 `consent=true`를 보내며, 자료만 찾기는 `generate=false, consent=false`로 외부 AI를 호출하지 않는다. 서버의 요청별 확인과 환경의 외부전송·지침 공유 승인 검증은 유지한다. 공급자·모델·연결 상태 문자열은 사용자 화면에 표시하지 않는다.
 
 공식 Hive 모델 목록 문서에는 고정 모델 ID가 있지만 계정의 `GET /models` API는 확인되지 않았다. 임의 주소나 목록 응답을 만들지 않는다. `npm run rag:check -- --live`는 Hive 모드에서 공개 프로그램 안내로 실제 completion을 호출하고 반환 모델 ID·JSON 인용 답변을 검증한다. DeepSeek 직결은 기존 공식 `/models` 확인을 유지한다.
 
@@ -23,3 +23,5 @@ RAG_LIBRARY_ENABLED=false
 교체 전 앱을 중지한 상태에서 기존 DB·uploads를 백업하고 별도 경로에 복원해 검사한다. 호출한도 `DATA_DIR/rag-usage.sqlite`는 기존 백업 스크립트 대상에 포함되지 않으므로 앱 중지 시 별도 복사·SHA-256·SQLite 무결성 및 복원 대조를 수행한다. 비공개 corpus는 이전 버전·원본 ZIP·읽기 전용 연결을 보존한다. 환경을 되돌릴 때 키·설정은 보호된 이전 환경파일을 사용하고 기존 데이터 경로를 덮어쓰지 않는다.
 
 공식 명세: [Hive Chat Completions](https://docs.thehive.ai/docs/chat-completions-openai-compatible-llms), [DeepSeek V4.1 Flash-1017](https://docs.thehive.ai/docs/deepseek-v41-flash). 2026-11-02 확인.
+
+챗봇의 기본 제출과 Enter는 답변 요청이다. 한글 조합 중 Enter와 Shift+Enter는 전송하지 않는다. 답변이 도착하면 해당 대화로 이동하고, 오류는 입력을 보존하며 같은 질문·범위·이전 문맥으로 다시 시도할 수 있다. 지침이 제공되지 않을 때는 해당 추천 질문과 범위 선택을 표시하지 않으며, 직접 지침 요청이 와도 서버는 제공 범위를 설명하고 자료를 공개하지 않는다.

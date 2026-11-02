@@ -1,16 +1,64 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {MessageCircle,Search,Send,BookOpen,Trash2} from 'lucide-react';
 import {api} from '../api';
 import {useResource} from '../context';
 import {PageHead,Notice,Field,Loading,ErrorBox} from '../components/UI';
 interface Source{id:string;label:string;documentId:string;title:string;kind:string;currentness:string;dateNote:string;locator:string;lineStart:number;lineEnd:number;text:string;quality:string;source:string;route:string|null;originalName:string;originalAvailable:boolean}
 interface Answer{requestId:string;mode:string;message:string;sections:{text:string;sourceIds:string[]}[];sources:Source[];warnings:string[];model:string|null;needsReview:boolean}
-interface Status{appDocuments:number;libraryDocuments:number;libraryChunks:number;warning:string;aiConfigured:boolean;provider:string;model:string;libraryExternalApproved:boolean}
-interface Turn{question:string;answer:Answer}
+interface Status{libraryDocuments:number}
+interface Turn{question:string;answer:Answer;scope:string;history:string[]}
 const labels:Record<string,string>={APP:'프로그램 사용법',REFERENCE:'제공판 원문',TEMPLATE:'서식 포함 원문',DESIGN:'정리·설계 제안 (법령 아님)'};
-function AnswerView({turn,index}:{turn:Turn;index:number}){const {answer:a}=turn;const reveal=(label:string)=>{const el=document.getElementById(`rag-${index}-${label}`);el?.setAttribute('open','');el?.scrollIntoView({block:'center',behavior:'smooth'});};return <article className="rag-turn"><div className="rag-question"><span>내 질문</span><p>{turn.question}</p></div><div className="rag-answer"><h2><BookOpen size={20}/>{a.mode==='GENERATED'?'근거 기반 AI 답변':a.mode==='NO_EVIDENCE'?'근거 확인 필요':'자료 검색 결과'}</h2><p className="subtle">{a.message}</p>{a.sections.map((s,i)=><div className="rag-paragraph" key={i}><p>{s.text}</p><div className="actions">{s.sourceIds.map(id=><button type="button" className="text-button" onClick={()=>reveal(id)} key={id}>[{id}] 근거 보기</button>)}</div></div>)}{a.model?<p className="fineprint">응답 모델: {a.model} · 행정 처리 없이 안내만 제공합니다.</p>:null}<div className="rag-sources">{a.sources.map(s=><details id={`rag-${index}-${s.label}`} key={s.id} open={a.mode!=='GENERATED'&&s.label==='S1'}><summary><strong>[{s.label}] {s.title}</strong><span>{labels[s.kind]||s.kind} · {s.documentId} · {s.locator}{s.kind!=='APP'?` · MD ${s.lineStart}–${s.lineEnd}행`:''}</span></summary><div className="rag-source-body"><p className="fineprint">{s.dateNote} · {s.kind==='APP'?'현재 제품 안내': '현행성 미검증 / 제공판 참고'}{s.quality==='OCR'?' · 자동 OCR: 원문 대조 필요':''}</p><pre>{s.text}</pre><div className="actions">{s.route?<a className="button secondary compact" href={'#'+s.route}>해당 기능 열기</a>:null}{s.originalAvailable?<a className="button secondary compact" href={`/api/rag/documents/${encodeURIComponent(s.documentId)}/original`}>원본 자료 받기</a>:s.source==='LIBRARY'?<small>원본 파일 미연결 · 변환 텍스트만 제공</small>:null}</div>{s.originalAvailable?<small>원본 후보입니다. 빈 양식·작성예시·최신 서식 여부를 확인한 뒤 사용하세요.</small>:null}</div></details>)}</div></div></article>;}
-export default function Assistant(){const {data:status,loading,error,reload}=useResource<Status>('/rag/status');const [question,setQuestion]=useState(''),[scope,setScope]=useState('app'),[busy,setBusy]=useState(false),[problem,setProblem]=useState(''),[turns,setTurns]=useState<Turn[]>([]);const lock=useRef(false);
- // Explicit AI-button requests confirm generation; search alone never sends data to a provider.
- async function ask(generate:boolean){if(lock.current||question.trim().length<2)return;lock.current=true;setBusy(true);setProblem('');const q=question.trim();try{const answer=await api<Answer>('/rag/ask',{method:'POST',body:JSON.stringify({question:q,scope,generate,consent:generate,history:turns.slice(-3).map(t=>t.question)})});setTurns(t=>[...t,{question:q,answer}].slice(-20));setQuestion('');}catch(e){setProblem(e instanceof Error?e.message:'요청에 실패했습니다.');}finally{lock.current=false;setBusy(false);}}
- return <div className="rag-page"><PageHead title="AI 업무도우미" description="지침과 사용법을 한곳에서 찾고, 답변의 근거를 직접 확인하세요." action={<MessageCircle size={32}/>}/>{loading?<Loading/>:error?<ErrorBox message={error} retry={reload}/>:<><div className="rag-status"><span>프로그램 안내 <b>{status?.appDocuments}개</b></span><span>제공 지침 <b>{status?.libraryDocuments}개</b></span><span>{status?.aiConfigured?`${status?.provider==='hive'?'딥시크(Hive)':'딥시크'} 설정됨 · 실응답 확인 필요`:'딥시크 미연결 · 근거 검색 가능'}</span></div>{status?.warning?<Notice tone="warning">{status.warning}</Notice>:null}<Notice>제공 지침의 최신 효력·적용기관은 별도 확인이 필요합니다. 질문에 개인정보·비밀번호·API 키를 넣지 마세요. 이 채팅은 승인이나 대장 변경을 하지 않습니다.</Notice><div className="rag-prompts">{['엑셀로 물품을 어떻게 등록하나요?','다량 물품 상태를 쉽게 입력하려면?','소요조회 15일은 의무인가요?','관리전환 합의서 양식도 찾아줘'].map(q=><button className="button secondary compact" type="button" key={q} disabled={busy} onClick={()=>{setQuestion(q);setScope(/소요조회|합의서/.test(q)?'library':'app');}}>{q}</button>)}</div><div className="rag-transcript" aria-label="대화 내역">{turns.map((t,i)=><AnswerView turn={t} index={i} key={t.answer.requestId}/>)}{!turns.length?<div className="rag-empty"><BookOpen size={30}/><h2>먼저 근거를 찾아보세요</h2><p>검색은 외부 모델 없이 동작합니다. AI 답변 받기를 눌러 검색 근거를 바탕으로 답변을 요청하세요.</p></div>:null}</div><form className="rag-composer" onSubmit={e=>{e.preventDefault();void ask(false);}}><Field label="검색 범위"><select value={scope} onChange={e=>setScope(e.target.value)} disabled={busy}><option value="app">프로그램 사용법</option><option value="library">법령·지침·서식 (제공판)</option><option value="all">모두</option></select></Field><Field label="업무 질문"><textarea rows={3} maxLength={1000} value={question} onChange={e=>setQuestion(e.target.value)} placeholder="예: 불용결정 후 다른 학교에 의자를 넘기려면 어떤 자료가 필요한가요?" required disabled={busy}/></Field>{scope!=='app'&&!status?.libraryExternalApproved?<p className="fineprint">지침의 외부 전송은 별도 승인 설정이 필요합니다. 미승인 상태에서는 검색만 제공합니다.</p>:null}<div className="actions"><button className="button secondary" type="submit" disabled={busy||question.trim().length<2}><Search size={18}/>{busy?'처리 중…':'근거 검색'}</button><button className="button primary" type="button" disabled={busy||!status?.aiConfigured||question.trim().length<2} onClick={()=>void ask(true)}><Send size={18}/>AI 답변 받기</button><button className="text-button" type="button" disabled={busy||!turns.length} onClick={()=>setTurns([])}><Trash2 size={15}/>대화 비우기</button></div><p className="fineprint">대화본문은 서버에 저장하지 않습니다. 새로고침·화면 이동 시 이 대화가 사라집니다.</p>{busy?<p role="status">질문을 처리하고 있습니다.</p>:null}{problem?<Notice tone="warning">{problem}</Notice>:null}</form></>}</div>;
+function AnswerView({turn,index,onRetry,busy}:{turn:Turn;index:number;onRetry?:()=>void;busy:boolean}){
+ const {answer:a}=turn;
+ const reveal=(label:string)=>{const el=document.getElementById(`rag-${index}-${label}`);el?.setAttribute('open','');el?.scrollIntoView({block:'center',behavior:'smooth'});};
+ const title=a.mode==='GENERATED'?'답변':a.mode==='PROVIDER_ERROR'?'답변을 받지 못했습니다':a.mode==='NO_EVIDENCE'?'확인할 자료가 필요합니다':'관련 자료';
+ return <article className="rag-turn" id={`rag-turn-${a.requestId}`}>
+  <div className="rag-question"><span>내 질문</span><p>{turn.question}</p></div>
+  <div className="rag-answer"><h2><BookOpen size={20}/>{title}</h2>
+   {a.mode!=='GENERATED'?<p className="subtle" role={a.mode==='PROVIDER_ERROR'?'alert':undefined}>{a.message}</p>:null}
+   {onRetry?<button className="button secondary compact" type="button" onClick={onRetry} disabled={busy}>다시 시도</button>:null}
+   {a.sections.map((s,i)=><div className="rag-paragraph" key={i}><p>{s.text}</p><div className="actions">{s.sourceIds.map(id=><button type="button" className="text-button" onClick={()=>reveal(id)} key={id}>[{id}] 출처 보기</button>)}</div></div>)}
+   <div className="rag-sources">{a.sources.map(s=><details id={`rag-${index}-${s.label}`} key={s.id} open={a.mode!=='GENERATED'&&s.label==='S1'}>
+    <summary><strong>[{s.label}] {s.title}</strong><span>{labels[s.kind]||s.kind} · {s.locator}{s.kind!=='APP'?` · MD ${s.lineStart}–${s.lineEnd}행`:''}</span></summary>
+    <div className="rag-source-body"><p className="fineprint">{s.dateNote} · {s.kind==='APP'?'현재 제품 안내':'현행성 미검증 / 제공판 참고'}{s.quality==='OCR'?' · 자동 OCR: 원문 대조 필요':''}</p><pre>{s.text}</pre>
+     <div className="actions">{s.route?<a className="button secondary compact" href={'#'+s.route}>해당 기능 열기</a>:null}{s.originalAvailable?<a className="button secondary compact" href={`/api/rag/documents/${encodeURIComponent(s.documentId)}/original`}>원본 자료 받기</a>:s.source==='LIBRARY'?<small>원본 파일 미연결 · 변환 텍스트만 제공</small>:null}</div>
+     {s.originalAvailable?<small>원본 후보입니다. 빈 양식·작성예시·최신 서식 여부를 확인한 뒤 사용하세요.</small>:null}
+    </div>
+   </details>)}</div>
+  </div>
+ </article>;
+}
+export default function Assistant(){
+ const {data:status,loading,error,reload}=useResource<Status>('/rag/status');
+ const [question,setQuestion]=useState(''),[scope,setScope]=useState('app'),[busy,setBusy]=useState(false),[problem,setProblem]=useState(''),[turns,setTurns]=useState<Turn[]>([]);
+ const lock=useRef(false),libraryAvailable=(status?.libraryDocuments||0)>0;
+ useEffect(()=>{if(turns.length)document.getElementById(`rag-turn-${turns[turns.length-1].answer.requestId}`)?.scrollIntoView({block:'start',behavior:'smooth'});},[turns]);
+ const prompts=libraryAvailable?['엑셀로 물품을 어떻게 등록하나요?','다량 물품 상태를 쉽게 입력하려면?','소요조회 15일은 의무인가요?','관리전환 합의서 양식도 찾아줘']:['엑셀로 물품을 어떻게 등록하나요?','다량 물품 상태를 쉽게 입력하려면?','받기 신청 후 재고는 언제 예약되나요?','개선사항에 파일은 어떻게 첨부하나요?'];
+ // Only explicit submission requests generation; source lookup never calls the provider.
+ async function ask(generate:boolean,retry?:Pick<Turn,'question'|'scope'|'history'>){
+  const q=(retry?.question??question).trim();if(lock.current||q.length<2)return;
+  lock.current=true;setBusy(true);setProblem('');
+  const requestScope=libraryAvailable?(retry?.scope??scope):'app';
+  const history=retry?.history??turns.filter(t=>t.answer.mode==='GENERATED'||t.answer.mode==='SEARCH_ONLY').slice(-3).map(t=>t.question);
+  try{
+   const answer=await api<Answer>('/rag/ask',{method:'POST',signal:AbortSignal.timeout(65000),body:JSON.stringify({question:q,scope:requestScope,generate,consent:generate,history})});
+   setTurns(t=>[...t,{question:q,answer,scope:requestScope,history}].slice(-20));
+   if(answer.mode==='GENERATED'||answer.mode==='SEARCH_ONLY')setQuestion(current=>current.trim()===q?'':current);
+  }catch(e){setProblem(e instanceof Error&&/TimeoutError|AbortError/.test(e.name)?'답변 요청 시간이 길어졌습니다. 다시 시도해 주세요.':e instanceof Error?e.message:'요청에 실패했습니다. 다시 시도해 주세요.');}
+  finally{lock.current=false;setBusy(false);}
+ }
+ return <div className="rag-page">
+  <PageHead title="AI 업무도우미" description="궁금한 내용을 질문하고 답변과 출처를 확인하세요." action={<MessageCircle size={32}/>}/>
+  {loading?<Loading/>:error?<ErrorBox message={error} retry={reload}/>:<>
+   <div className="rag-prompts">{prompts.map(q=><button className="button secondary compact" type="button" key={q} disabled={busy} onClick={()=>{setQuestion(q);setScope(/소요조회|합의서/.test(q)?'library':'app');}}>{q}</button>)}</div>
+   <div className="rag-transcript" aria-label="대화 내역">{turns.map((t,i)=><AnswerView turn={t} index={i} key={t.answer.requestId} busy={busy} onRetry={i===turns.length-1&&t.answer.mode==='PROVIDER_ERROR'?()=>void ask(true,t):undefined}/>)}{!turns.length?<div className="rag-empty"><BookOpen size={30}/><h2>무엇을 도와드릴까요?</h2><p>물품 등록·신청·인계·배송 등 사용 방법을 질문해 주세요.</p></div>:null}</div>
+   <form className="rag-composer" onSubmit={e=>{e.preventDefault();void ask(true);}}>
+    {libraryAvailable?<Field label="검색 범위"><select value={scope} onChange={e=>setScope(e.target.value)} disabled={busy}><option value="app">프로그램 사용법</option><option value="library">법령·지침·서식 (제공판)</option><option value="all">모두</option></select></Field>:null}
+    <Field label="업무 질문"><textarea rows={3} maxLength={1000} value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing&&e.nativeEvent.keyCode!==229){e.preventDefault();void ask(true);}}} placeholder="예: 물품을 등록하려면 어떻게 하나요?" required disabled={busy}/></Field>
+    <div className="actions"><button className="button primary" type="submit" disabled={busy||question.trim().length<2}><Send size={18}/>{busy?'답변을 준비하고 있습니다…':'답변 받기'}</button><button className="button secondary" type="button" disabled={busy||question.trim().length<2} onClick={()=>void ask(false)}><Search size={18}/>자료만 찾기</button><button className="text-button" type="button" disabled={busy||!turns.length} onClick={()=>setTurns([])}><Trash2 size={15}/>대화 비우기</button></div>
+    <p className="fineprint">Enter로 전송 · Shift+Enter로 줄바꿈. 대화는 새로고침하면 사라집니다.</p>
+    {busy?<p role="status">답변을 준비하고 있습니다.</p>:null}{problem?<Notice tone="warning">{problem}</Notice>:null}
+   </form>
+  </>}
+ </div>;
 }

@@ -22,8 +22,8 @@ export function mountRag(app,{dataDir,env=process.env,fetcher=fetch,knowledge}={
   const warnings=['지침은 제공판·현행성 미검증입니다. 금액·기간·예외는 원문과 현행 규정으로 확인하세요.','AI 답변은 행정 결재·법률 판단·대장 변경을 수행하지 않습니다.'];
   const base={requestId:randomUUID(),queryHash:hash(d.question),sections:[],sources:[],mode:'SEARCH_ONLY',model:null,warnings,needsReview:true};
   const label=items=>items.map((s,i)=>({...s,label:'S'+(i+1)}));
-  if(!sources.length)return res.json({...base,mode:'NO_EVIDENCE',message:'해당 질문에 답할 근거를 찾지 못했습니다. 품명·업무명 또는 문서명을 구체적으로 입력하세요.'});
-  if(!d.generate)return res.json({...base,sources:label(sources),message:'검색된 근거입니다. AI가 생성한 답변은 아닙니다.'});
+  if(!sources.length)return res.json({...base,mode:'NO_EVIDENCE',message:d.scope==='library'&&!kb.stats().libraryDocuments?'지침 자료는 현재 제공되지 않습니다. 물품 등록·신청·인계·배송 등 프로그램 사용법을 질문해 주세요.':'해당 질문에 답할 근거를 찾지 못했습니다. 물품 등록·신청·인계·배송 등 업무 내용을 구체적으로 입력해 주세요.'});
+  if(!d.generate)return res.json({...base,sources:label(sources),message:'질문과 관련된 자료입니다.'});
   if(!d.consent)return res.status(400).json({error:'질문과 검색 근거를 딥시크에 보내는 데 동의해야 합니다.'});
   if(!ready(config))return res.json({...base,sources:label(sources),message:'딥시크 연결 또는 외부전송 승인이 없어 검색 근거만 표시합니다.'});
   if(!config.libraryExternalApproved&&sources.some(s=>s.source==='LIBRARY'))return res.json({...base,sources:label(sources),message:'지침 자료의 외부 전송 승인이 없어 AI 호출 없이 근거만 표시합니다. 프로그램 사용법은 프로그램 범위로 질문하세요.'});
