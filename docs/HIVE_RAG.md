@@ -24,4 +24,4 @@ RAG_LIBRARY_ENABLED=false
 
 공식 명세: [Hive Chat Completions](https://docs.thehive.ai/docs/chat-completions-openai-compatible-llms), [DeepSeek V4.1 Flash-1017](https://docs.thehive.ai/docs/deepseek-v41-flash). 2026-11-02 확인.
 
-챗봇의 기본 제출과 Enter는 답변 요청이다. 한글 조합 중 Enter와 Shift+Enter는 전송하지 않는다. 답변이 도착하면 해당 대화로 이동하고, 오류는 입력을 보존하며 같은 질문·범위·이전 문맥으로 다시 시도할 수 있다. 지침이 제공되지 않을 때는 해당 추천 질문과 범위 선택을 표시하지 않으며, 직접 지침 요청이 와도 서버는 제공 범위를 설명하고 자료를 공개하지 않는다.
+추천 질문 클릭과 챗봇의 기본 제출·Enter는 답변 요청이다. 요청 즉시 질문과 기다리는 표시를 화면에 보여준다. 한글 조합 중 Enter와 Shift+Enter는 전송하지 않는다. 답변이 도착하면 해당 대화로 이동하고, 오류는 입력을 보존하며 같은 질문·범위·이전 문맥으로 다시 시도할 수 있다. 지침이 제공되지 않을 때는 해당 추천 질문과 범위 선택을 표시하지 않으며, 직접 지침 요청이 와도 서버는 제공 범위를 설명하고 자료를 공개하지 않는다.
