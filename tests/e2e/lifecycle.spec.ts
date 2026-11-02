@@ -10,6 +10,19 @@ async function login(page:Page,email:string){
   await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();
 }
 async function toast(page:Page,text:string){await expect(page.locator('.toast')).toContainText(text);}
+
+async function saveStep(page:Page,step:string){
+  const reference='합성근거-'+step;
+  await page.getByLabel('확인할 단계').selectOption(step);
+  await page.getByLabel('공식 처리번호·확인 근거').fill(reference);
+  const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/steps')&&r.request().postDataJSON()?.step===step);
+  await page.getByRole('button',{name:'확인 근거 저장',exact:true}).click();
+  expect((await response).status()).toBe(200);
+  await toast(page,'수동 확인 근거를 기록');
+  // A previous identical toast can still be visible. Wait for this saved step after reload.
+  await expect(page.locator('.step-list').getByText(reference,{exact:false})).toBeVisible();
+}
+
 async function download(page:Page,name:string){
   const pending=page.waitForEvent('download');await page.getByRole('button',{name,exact:true}).click();
   const file=await pending;expect(await file.failure()).toBeNull();return {name:file.suggestedFilename(),bytes:await readFile((await file.path())!)};
@@ -60,7 +73,7 @@ test('등록부터 독립 검토·양 기관 증빙·불일치 보류·대장 �
     for(const [p,steps] of [[reviewer,['inquiry','agreement_sender','approval_sender']],[buyerReviewer,['agreement_receiver','approval_receiver']]] as [Page,string[]][]){
       await p.goto('/'+casePath);await p.locator('.upload-control input[type=file]').setInputFiles(attachment);await toast(p,'첨부파일을 저장');
       await p.getByLabel('우리 기관이 첨부한 증빙').selectOption({label:attachment.name});
-      for(const step of steps){await p.getByLabel('확인할 단계').selectOption(step);await p.getByLabel('공식 처리번호·확인 근거').fill('합성근거-'+step);await p.getByRole('button',{name:'확인 근거 저장',exact:true}).click();await toast(p,'수동 확인 근거를 기록');}
+      for(const step of steps){await saveStep(p,step);}
     }
     // Actual CSV file import, preserving leading zeroes, then asset binding.
     await page.goto('/#/inventory');await expect(page.getByRole('heading',{name:'대장 가져오기·자산 연결',exact:true})).toBeVisible();
@@ -79,8 +92,7 @@ test('등록부터 독립 검토·양 기관 증빙·불일치 보류·대장 �
     await receiver.getByRole('button',{name:'인수 사실 기록',exact:true}).click();await expect(receiver.locator('.badge')).toHaveText('수량 불일치');await expect(receiver.getByRole('alert')).toContainText('배정 수량 전체가 보류');
     await receiver.getByLabel('실제로 받은 수량').fill('3');await receiver.getByRole('button',{name:'인수 사실 기록',exact:true}).click();await expect(receiver.locator('.badge')).toHaveText('인수 확인');
     for(const [p,step] of [[reviewer,'ledger_sender'],[buyerReviewer,'ledger_receiver']] as [Page,string][]){
-      await p.reload();await p.getByLabel('우리 기관이 첨부한 증빙').selectOption({label:attachment.name});await p.getByLabel('확인할 단계').selectOption(step);await p.getByLabel('공식 처리번호·확인 근거').fill('합성근거-'+step);
-      await p.getByRole('button',{name:'확인 근거 저장',exact:true}).click();await toast(p,'수동 확인 근거를 기록');
+      await p.reload();await p.getByLabel('우리 기관이 첨부한 증빙').selectOption({label:attachment.name});await saveStep(p,step);
     }
     await reviewer.reload();await reviewer.getByRole('button',{name:'모든 증빙 확인 완료',exact:true}).click();await expect(reviewer.locator('.badge')).toHaveText('증빙 확인 완료');
     await expect(reviewer.getByText('공식 API로 확인된 행정완료는 아닙니다.')).toBeVisible();
