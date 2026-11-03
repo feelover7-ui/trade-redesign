@@ -3,7 +3,7 @@ import {demandWorkbook,startExternalTestServer} from '../fixtures/v07-external-s
 let external:Awaited<ReturnType<typeof startExternalTestServer>>;
 test.beforeAll(async()=>{external=await startExternalTestServer();});
 test.afterAll(async()=>{await external?.close();});
-async function login(page:Page,url='/'){await page.goto(url);await page.getByLabel('이메일',{exact:true}).fill('staff1@demo.local');await page.getByLabel('비밀번호',{exact:true}).fill('DemoTrade!2026');await page.getByRole('button',{name:'기관 계정으로 로그인'}).click();await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();}
+async function login(page:Page,url='/'){await page.goto(url);await page.getByLabel('이메일',{exact:true}).fill('staff1@demo.local');await page.getByLabel('비밀번호',{exact:true}).fill('DemoTrade!2026');await page.getByRole('button',{name:'기관 계정으로 로그인'}).click();await expect(page.getByRole('heading',{name:'오늘 할 일',exact:true})).toBeVisible();await page.goto('/#/market');await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();}
 async function drop(page:Page,name:string,bytes:Buffer,zone='excel-upload-dropzone'){
  const data=await page.evaluateHandle(({name,bytes})=>{const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(bytes)],name,{type:'application/octet-stream'}));return dt;},{name,bytes:Array.from(bytes)});await page.getByTestId(zone).dispatchEvent('dragenter',{dataTransfer:data});await page.getByTestId(zone).dispatchEvent('drop',{dataTransfer:data});await data.dispose();
 }
