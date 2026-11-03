@@ -17,3 +17,89 @@
 /* v0.6: reference-derived registration and inventory additions. */
 .import-photo-grid,.department-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0}.import-photo-card{min-width:0;border:1px solid #dbe4e5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}.import-photo-card img{width:100%;height:150px;object-fit:contain;background:#f5f7f8}.import-photo-card select{max-width:100%;width:100%}.department-card{padding:20px;text-align:left;border:1px solid #dae5e3;background:white;border-radius:14px;display:grid;gap:8px}.department-card.selected{border-color:var(--primary,#28766c);background:#edf7f4}.block{display:block;color:#637575;margin-top:6px}.market-pagination{justify-content:center;margin:20px 0}.reference-photo-label{position:absolute;left:10px;bottom:10px;background:#fff9e7;padding:5px 8px;border-radius:5px;font-size:12px;color:#695113}progress{width:100%;height:12px;margin:16px 0}.search-bar select{max-width:180px;border:0;background:transparent;padding:8px;color:inherit}.import-photo-section{padding:16px 0;border-top:1px solid #dfe8e7}.sidebar nav{overflow-y:auto;min-height:0}.sidebar{overflow:hidden}.table-scroll td{max-width:360px;overflow-wrap:anywhere}
 @media(max-width:640px){.department-grid,.import-photo-grid{grid-template-columns:1fr}.search-bar{flex-wrap:wrap}.search-bar select{flex-basis:100%;max-width:100%}.search-bar input{flex-basis:75%;min-width:0}.main-content .page-heading h1{overflow-wrap:anywhere}.import-photo-card img{height:180px}}
+
+/* ─────────────────────────────────────────────────────────────
+   디자인 정리 v0.6 (docs/DESIGN_SYSTEM.md)
+   기존 규칙 위에 덮어쓰는 층. 색·글자·간격 기준을 토큰으로 모으고
+   한글 줄바꿈·대비·모바일 배치를 바로잡는다.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --font-sans:'Pretendard Variable',Pretendard,'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  /* 색: 브랜드 초록 1계열 + 중립 회녹색 + 상태색 */
+  --primary:#147d64;--primary-dark:#0c604d;--primary-soft:#e6f3ee;--primary-line:#bfe0d3;
+  --ink:#1f3229;--ink-2:#3d5147;--muted:#5d6c64;--faint:#8a978f;
+  --line:#e1e8e3;--line-strong:#cfd9d2;--surface:#ffffff;--canvas:#f6f8f7;
+  --ok:#1f7a4d;--ok-soft:#e5f4ea;--warn:#a5600b;--warn-soft:#fdf2e1;--bad:#b23a2a;--bad-soft:#fdecea;
+  /* 크기 */
+  --fs-xs:12px;--fs-sm:13px;--fs-md:15px;--fs-lg:17px;
+  --radius-sm:8px;--radius:12px;--radius-lg:16px;
+  --shadow-1:0 1px 2px rgba(20,48,36,.06);--shadow-2:0 6px 20px rgba(20,48,36,.08);
+  font-family:var(--font-sans);color:var(--ink);background:var(--canvas)
+}
+body{word-break:keep-all;overflow-wrap:anywhere;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.card-title{font-family:var(--font-sans);color:var(--ink)}
+h1{font-weight:700;letter-spacing:-.6px}
+h2{font-weight:700}
+h3{font-weight:650}
+small,.subtle,.page-heading p{color:var(--muted)}
+.page-heading p{font-size:var(--fs-md);line-height:1.6}
+
+/* 제목 줄: 상태 배지를 제목 옆에 붙임 */
+.heading-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.heading-row>div{min-width:0;flex:1 1 320px}
+.heading-row:has(>.badge){justify-content:flex-start}
+.heading-row>.badge{margin-top:12px}
+.heading-row>div:has(+.badge){flex:0 1 auto}
+.badge{font-size:var(--fs-xs);padding:5px 10px;border-radius:999px;letter-spacing:.1px}
+
+/* 사이드바: 묶음 제목 */
+.sidebar nav{gap:14px}
+.nav-group{display:grid;gap:2px}
+.nav-group-title{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--faint);padding:0 14px 4px}
+.nav-item{color:var(--ink-2);padding:11px 14px;font-weight:550}
+.nav-item.active{background:var(--primary-soft);color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+
+/* 입력·버튼: 경계선 대비와 초점 */
+input:not([type=checkbox]),select,textarea{border-color:var(--line-strong);color:var(--ink)}
+input:not([type=checkbox]):focus,select:focus,textarea:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px var(--primary-soft)}
+*:focus-visible{outline:3px solid var(--primary-line);outline-offset:2px}
+.secondary{border-color:var(--line-strong);color:var(--ink-2)}
+.button:hover{transform:none}
+.button:active{transform:translateY(1px)}
+
+/* 물품 카드 */
+.lot-card{border-radius:var(--radius-lg);box-shadow:var(--shadow-1);transition:box-shadow .2s,border-color .2s}
+.lot-card:hover{box-shadow:var(--shadow-2);border-color:var(--primary-line)}
+.card-category{font-size:var(--fs-xs);color:var(--muted);font-weight:600}
+.card-title{font-weight:650}
+.quantity-tag{font-weight:700}
+
+/* 물품 찾기: 분류 칩·필터 줄 */
+.category-tabs button{color:var(--ink-2);border-color:var(--line-strong);font-size:var(--fs-sm)}
+.category-tabs button:hover{border-color:var(--primary-line);background:var(--primary-soft)}
+.market-toolbar select,.filters input.min-count{border-color:var(--line-strong);background:var(--surface)}
+
+/* 물품 상세: 배송비 링크는 신청 칸 아래로 */
+.detail-side{display:flex;flex-direction:column;gap:14px}
+.detail-side>.shipping-link{order:9;margin:0;width:100%}
+.request-panel{border-radius:var(--radius-lg);box-shadow:var(--shadow-1)}
+.detail-image{border-radius:var(--radius-lg);overflow:hidden}
+
+/* 상단 시연 띠 */
+.demo-banner{font-size:var(--fs-sm);color:var(--ink-2)}
+
+@media(max-width:800px){
+  .bottom-nav a{font-size:11px;color:var(--muted);gap:3px}
+  .bottom-nav a.active{color:var(--primary)}
+}
+@media(max-width:600px){
+  .page-heading h1{font-size:24px;line-height:1.35}
+  .category-tabs{margin:16px -16px;padding:0 16px 4px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 88%,transparent)}
+  .category-tabs::-webkit-scrollbar{display:none}
+  .category-tabs button{font-size:var(--fs-sm)}
+  .market-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:stretch}
+  .market-toolbar .filters{display:contents}
+  .market-toolbar select,.filters input.min-count,.market-toolbar .button{width:100%;font-size:var(--fs-sm)}
+  .demo-banner{font-size:var(--fs-xs)}
+}
+@media(prefers-reduced-motion:reduce){.lot-card{transition:none}}
