@@ -1,8 +1,9 @@
 /** Additive v2 migration; never rebuild or reset existing business tables. */
 export function migrateEnhancements(db) {
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
-  if(version>2)throw new Error('Database version is newer than this application. Do not downgrade.');
-  if(version===2)return;
+  if(version>3)throw new Error('Database version is newer than this application. Do not downgrade.');
+  if(version===3)return;
+  if(version<2){
   db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS import_batches(
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id),
@@ -36,4 +37,12 @@ export function migrateEnhancements(db) {
     CREATE INDEX IF NOT EXISTS idx_shipping_org ON shipping_quotes(org_id,created_at);
     PRAGMA user_version=2;
     COMMIT;`);
+  }
+  db.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE IF NOT EXISTS import_images(id TEXT PRIMARY KEY,batch_id TEXT NOT NULL REFERENCES import_batches(id),sheet TEXT NOT NULL,row_number INTEGER NOT NULL,end_row INTEGER NOT NULL,column_number INTEGER NOT NULL,name TEXT NOT NULL,bytes BLOB NOT NULL,sha256 TEXT NOT NULL,file_id TEXT REFERENCES files(id) ON DELETE SET NULL);
+    CREATE TABLE IF NOT EXISTS catalog_cache(query_hash TEXT PRIMARY KEY,payload TEXT NOT NULL,fetched_at TEXT NOT NULL,expires_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS catalog_usage(day TEXT NOT NULL,org_id TEXT NOT NULL,calls INTEGER NOT NULL,PRIMARY KEY(day,org_id));
+    CREATE TABLE IF NOT EXISTS catalog_images(lot_id TEXT PRIMARY KEY REFERENCES lots(id),suggestion_id TEXT NOT NULL,bytes BLOB NOT NULL,sha256 TEXT NOT NULL,source_url TEXT NOT NULL,reference_url TEXT NOT NULL,identifier TEXT NOT NULL,saved_by TEXT NOT NULL,created_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_import_images_batch ON import_images(batch_id);
+    PRAGMA user_version=3;COMMIT;`);
 }

@@ -1,0 +1,17 @@
+import {useState} from 'react';
+import {Search,Check} from 'lucide-react';
+import {post} from '../api';
+import {useAction,useResource} from '../context';
+import {Field,Notice,Section} from '../components/UI';
+import type {Draft} from '../types';
+import type {ProviderStatus} from './ProductAssistant';
+interface Product{title:string;manufacturer:string;model:string;description:string;actualIdentificationCode:string;classificationName?:string;matchType:string;sourceUrl:string;warning?:string}
+const labels={title:'물품 이름',manufacturer:'제조사',model:'모델명',description:'설명',actualIdentificationCode:'현물 조달번호',classificationName:'물품분류명'};
+function Result({item,draft,onApply}:{item:Product;draft:Draft;onApply:(value:Partial<Draft>)=>void}){
+ const [selected,setSelected]=useState<string[]>(Object.keys(labels).filter(k=>item[k as keyof Product]&&!draft[k as keyof Draft]));
+ return <article className="suggestion-card"><h3>{item.title}</h3><p className="badge">{item.matchType==='EXACT_IDENTIFIER'?'식별번호 일치 · 실물 확인 필요':'품명 후보 · 동일 제품인지 확인'}</p>{Object.entries(labels).filter(([k])=>item[k as keyof Product]).map(([k,label])=><label className="check" key={k}><input type="checkbox" checked={selected.includes(k)} onChange={e=>setSelected(v=>e.target.checked?[...v,k]:v.filter(x=>x!==k))}/><span><b>{label}</b> · {item[k as keyof Product]}</span></label>)}<a href={item.sourceUrl} target="_blank" rel="noreferrer">공식 데이터 출처</a><p className="fineprint">번호가 일치해도 기존 대장에 다른 제품의 코드가 기재됐을 수 있습니다. 실제 명판과 대조하세요.</p><button type="button" className="button primary" disabled={!selected.length} onClick={()=>onApply(Object.fromEntries(selected.map(k=>[k,item[k as keyof Product]])))}><Check size={18}/>선택한 정보로 입력하기</button></article>;
+}
+export default function RegistrationLookup({draft,onApply}:{draft:Draft;onApply:(value:Partial<Draft>)=>void}){
+ const {data:status}=useResource<ProviderStatus>('/assistant/status'),{busy,run}=useAction();const [query,setQuery]=useState(''),[name,setName]=useState(''),[result,setResult]=useState<Product[]|null>(null),[info,setInfo]=useState('');
+ return <Section title="조달청 정보로 등록 시작" description="목록번호 또는 품명으로 찾아 입력하세요. 인증키는 서버에만 설정하며 이 화면에 넣지 않습니다."><div className="form-grid"><Field label="조회할 물품목록번호 / 식별번호" help="분류 8자리-식별 8자리 또는 식별 8자리"><input value={query} maxLength={30} inputMode="numeric" onChange={e=>setQuery(e.target.value)} placeholder="00000000-00000000"/></Field><Field label="조회할 품명"><input value={name} maxLength={100} onChange={e=>setName(e.target.value)} placeholder="예: 접이식 의자"/></Field></div><button type="button" className="button secondary" disabled={busy||!status?.procurement.configured} onClick={()=>void run(async()=>{setResult(null);setInfo('');const q=query.trim();const r=await post<{candidates:Product[];cached:boolean;fetchedAt:string}>('/catalog/search',{name,identificationCode:/^\d{8}$/.test(q)?q:'',listingNo:q&&!/^\d{8}$/.test(q)?q:''});setResult(r.candidates);setInfo((r.cached?'저장된 조회 결과':'조달청 조회 결과')+' · '+new Date(r.fetchedAt).toLocaleString('ko-KR'));})}><Search size={18}/>{busy?'조회 중…':'등록용 조달정보 조회'}</button>{!status?.procurement.configured?<Notice>서버의 조달청 서비스키·활용신청 설정 후 활성화됩니다. 엑셀·직접 입력은 지금 사용할 수 있습니다.</Notice>:null}<p className="subtle">{info}</p>{result?.length===0?<Notice>결과가 없습니다. 번호를 비우고 품명으로 찾거나, 사진을 첨부해 AI 보완을 사용하세요.</Notice>:null}<div className="suggestions">{result?.map((p,i)=><Result key={p.actualIdentificationCode+String(i)} item={p} draft={draft} onApply={onApply}/>)}</div></Section>;
+}

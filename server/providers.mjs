@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {readCatalogResponse} from './catalog-response.mjs';
 import {must} from './db.mjs';
 
 export const PPS_ENDPOINT='https://apis.data.go.kr/1230000/ao/ThngListInfoService02/getThngPrdnmLocplcAccotListInfoInfoPrdlstSearch02';
@@ -28,7 +29,7 @@ export function normalizeCatalog(json,search={}){
    title:safeText(p.krnPrdctNm||p.prdctClsfcNoNm,100),manufacturer:safeText(p.mnfctCorpNm),model:'',
    description:safeText(p.krnPrdctNm,1000),category:'OTHER',
    actualIdentificationCode:/^\d{8}$/.test(String(p.prdctIdntNo))?String(p.prdctIdntNo):'',
-   classificationCode:safeText(p.dtilPrdctClsfcNo||p.prdctClsfcNo,10),
+   classificationCode:safeText(p.dtilPrdctClsfcNo||p.prdctClsfcNo,10),classificationName:safeText(p.prdctClsfcNoNm,200),
    imageUrl:safeReferenceUrl(p.prdctImgLrge),sourceUrl:PPS_SOURCE,
    matchType:search.identificationCode===String(p.prdctIdntNo)?'EXACT_IDENTIFIER':'NAME_CANDIDATE',
    warning:'조달 목록의 참고정보입니다. 현물·명판과 일치하는지 확인하세요. 대장 코드는 변경하지 않습니다.'
@@ -39,8 +40,8 @@ export async function searchCatalog(search,{env=process.env,fetcher=fetch}={}){
  const d=z.object({identificationCode:z.string().regex(/^$|^\d{8}$/).default(''),name:z.string().trim().max(100).default('')}).parse(search);
  must(d.identificationCode||d.name.length>=2,'조달 물품식별번호 8자리 또는 품명 2자 이상을 입력하세요.');
  const url=new URL(PPS_ENDPOINT);let key=env.DATA_GO_KR_SERVICE_KEY;try{key=decodeURIComponent(key);}catch{}
- url.search=new URLSearchParams({serviceKey:key,pageNo:'1',numOfRows:'10',type:'json',...(d.identificationCode?{prdctIdntNo:d.identificationCode}:{krnPrdctNm:d.name})}).toString();
- const json=await limitedJson(url,{},fetcher);return normalizeCatalog(json,d);
+ url.search=new URLSearchParams({[env.PROCUREMENT_KEY_PARAM==='ServiceKey'?'ServiceKey':'serviceKey']:key,pageNo:'1',numOfRows:'10',type:'json',...(d.identificationCode?{prdctIdntNo:d.identificationCode}:{krnPrdctNm:d.name})}).toString();
+ const json=await readCatalogResponse(url,fetcher);return normalizeCatalog(json,d);
 }
 export const aiProductSchema=z.object({
  title:z.string().max(100),manufacturer:z.string().max(200),model:z.string().max(200),description:z.string().max(2000),
