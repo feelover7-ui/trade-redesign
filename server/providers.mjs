@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {readCatalogResponse,checkCatalogCode} from './catalog-response.mjs';
 import {must} from './db.mjs';
 
 export const PPS_ENDPOINT='https://apis.data.go.kr/1230000/ao/ThngListInfoService02/getThngPrdnmLocplcAccotListInfoInfoPrdlstSearch02';
@@ -18,20 +19,26 @@ export async function limitedJson(url,options={},fetcher=fetch){
  data+=decoder.decode();try{return JSON.parse(data);}catch{throw Object.assign(new Error('외부 서비스가 JSON 대신 오류/인증 문서를 반환했습니다. 서비스키와 이용승인을 확인하세요.'),{status:502,code:'PROVIDER_FORMAT'});}
 }
 const safeText=(v,max=200)=>typeof v==='string'?v.trim().slice(0,max):typeof v==='number'?String(v):'';
-export function safeReferenceUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&(!u.port||u.port==='443')&&['g2b.go.kr','pps.go.kr'].some(d=>u.hostname===d||u.hostname.endsWith('.'+d))?u.href:'';}catch{return '';}}
+export function safeReferenceUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&![...u.searchParams.keys()].some(k=>/servicekey|api.?key|token|authorization/i.test(k))&&(!u.port||u.port==='443'||u.hostname==='img.g2b.go.kr'&&u.port==='7073')&&['g2b.go.kr','pps.go.kr'].some(d=>u.hostname===d||u.hostname.endsWith('.'+d))?u.href:'';}catch{return '';}}
+function manufacturerInfo(p){
+ const raw=safeText(p.mnfctCorpNm),parts=raw.split(',').map(s=>s.trim());
+ if(parts.length===1)return {manufacturer:raw,manufacturerRaw:raw,manufacturerDerived:false};
+ const derived=parts.length===3&&parts[0]===safeText(p.prdctClsfcNoNm)&&!!parts[1]&&!!parts[2]&&String(p.krnPrdctNm||'').includes(parts[2]);
+ return {manufacturer:derived?parts[1]:'',manufacturerRaw:raw,manufacturerDerived:!!derived};
+}
 export function normalizeCatalog(json,search={}){
  const response=json.response||json;const code=String(response.header?.resultCode??'');
- if(code==='03')return [];
+ if(code==='03')return [];checkCatalogCode(code);
  must(['00','0','0000'].includes(code),'조달청 조회 오류입니다. 이용승인/검색조건을 확인하세요.',502,'CATALOG_ERROR');
  const raw=response.body?.items;const list=Array.isArray(raw)?raw:Array.isArray(raw?.item)?raw.item:raw?.item?[raw.item]:[];
  return list.filter(p=>p.dltYn!=='Y'&&p.useYn!=='N').slice(0,10).map(p=>({
-   title:safeText(p.krnPrdctNm||p.prdctClsfcNoNm,100),manufacturer:safeText(p.mnfctCorpNm),model:'',
+   title:safeText(p.krnPrdctNm||p.prdctClsfcNoNm,100),...manufacturerInfo(p),model:'',
    description:safeText(p.krnPrdctNm,1000),category:'OTHER',
    actualIdentificationCode:/^\d{8}$/.test(String(p.prdctIdntNo))?String(p.prdctIdntNo):'',
-   classificationCode:safeText(p.dtilPrdctClsfcNo||p.prdctClsfcNo,10),
+   classificationCode:safeText(p.dtilPrdctClsfcNo||p.prdctClsfcNo,10),classificationName:safeText(p.prdctClsfcNoNm,200),
    imageUrl:safeReferenceUrl(p.prdctImgLrge),sourceUrl:PPS_SOURCE,
    matchType:search.identificationCode===String(p.prdctIdntNo)?'EXACT_IDENTIFIER':'NAME_CANDIDATE',
-   warning:'조달 목록의 참고정보입니다. 현물·명판과 일치하는지 확인하세요. 대장 코드는 변경하지 않습니다.'
+   warning:(manufacturerInfo(p).manufacturerDerived?'제조업체명 복합 원문에서 회사명을 분리한 제안입니다. ':'')+'조달 목록의 참고정보입니다. 현물·명판과 일치하는지 확인하세요. 대장 코드는 변경하지 않습니다.'
  }));
 }
 export async function searchCatalog(search,{env=process.env,fetcher=fetch}={}){
@@ -39,8 +46,8 @@ export async function searchCatalog(search,{env=process.env,fetcher=fetch}={}){
  const d=z.object({identificationCode:z.string().regex(/^$|^\d{8}$/).default(''),name:z.string().trim().max(100).default('')}).parse(search);
  must(d.identificationCode||d.name.length>=2,'조달 물품식별번호 8자리 또는 품명 2자 이상을 입력하세요.');
  const url=new URL(PPS_ENDPOINT);let key=env.DATA_GO_KR_SERVICE_KEY;try{key=decodeURIComponent(key);}catch{}
- url.search=new URLSearchParams({serviceKey:key,pageNo:'1',numOfRows:'10',type:'json',...(d.identificationCode?{prdctIdntNo:d.identificationCode}:{krnPrdctNm:d.name})}).toString();
- const json=await limitedJson(url,{},fetcher);return normalizeCatalog(json,d);
+ url.search=new URLSearchParams({[env.PROCUREMENT_KEY_PARAM==='ServiceKey'?'ServiceKey':'serviceKey']:key,pageNo:'1',numOfRows:'10',type:'json',...(d.identificationCode?{prdctIdntNo:d.identificationCode}:{krnPrdctNm:d.name})}).toString();
+ const json=await readCatalogResponse(url,fetcher);const serialized=JSON.stringify(json);must(![env.DATA_GO_KR_SERVICE_KEY,key,encodeURIComponent(key)].some(secret=>secret.length>=8&&serialized.includes(secret)),'조달청 응답에 인증정보가 포함되어 결과를 차단했습니다.',502,'CATALOG_SECRET_ECHO');return normalizeCatalog(json,d);
 }
 export const aiProductSchema=z.object({
  title:z.string().max(100),manufacturer:z.string().max(200),model:z.string().max(200),description:z.string().max(2000),

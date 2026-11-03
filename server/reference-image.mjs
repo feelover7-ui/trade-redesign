@@ -9,7 +9,7 @@ export async function referenceImage(value){
  // Pin the checked DNS result; no automatic redirects and no arbitrary client URLs.
  const data=await new Promise((resolve,reject)=>{
   const req=request(url,{lookup:(_host,opts,cb)=>opts?.all?cb(null,[resolved]):cb(null,resolved.address,4),timeout:10000,headers:{Accept:'image/jpeg,image/png,image/webp'}},res=>{
-   if(res.statusCode!==200){res.resume();return reject(new Error('참고사진 응답을 확인할 수 없습니다.'));}
+   if(res.statusCode!==200||!/^image\/(jpeg|png|webp)(?:;|$)/i.test(res.headers['content-type']||'')){res.resume();return reject(new Error('참고사진 응답을 확인할 수 없습니다.'));}
    let size=0;const chunks=[];res.on('data',part=>{size+=part.length;if(size>4*1024*1024){req.destroy(new Error('참고사진 크기 제한'));return;}chunks.push(part);});res.on('end',()=>resolve(Buffer.concat(chunks)));res.on('error',reject);
   });req.on('timeout',()=>req.destroy(new Error('참고사진 시간 제한')));req.on('error',reject);req.end();
  });

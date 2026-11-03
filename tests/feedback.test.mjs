@@ -87,6 +87,6 @@ test('v2→v3 마이그레이션은 기존 사용자·물품 테이블을 그대
   const path=join(root,'trade.sqlite'),f=fixture(path);
   f.db.exec('DROP TABLE feedback_attachments; DROP TABLE feedback; PRAGMA user_version=2');
   const users=f.db.prepare('SELECT * FROM users ORDER BY id').all();f.db.close();
-  let db=openDatabase(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,3);assert.deepEqual(db.prepare('SELECT * FROM users ORDER BY id').all(),users);db.close();
+  let db=openDatabase(path);assert.equal(db.prepare('PRAGMA user_version').get().user_version,4);assert.deepEqual(db.prepare('SELECT * FROM users ORDER BY id').all(),users);db.close();
   db=openDatabase(path);assert.equal(db.prepare('SELECT COUNT(*) n FROM feedback').get().n,0);assert.deepEqual(db.prepare('SELECT * FROM users ORDER BY id').all(),users);db.close();
 });

@@ -1,10 +1,15 @@
 import * as XLSX from 'xlsx';
+import {extractWorkbookImages} from './workbook-images.mjs';
 import {Worker,isMainThread,parentPort,workerData} from 'node:worker_threads';
 
 export const IMPORT_FIELDS = [
+ ['listingNo','물품목록번호 (8-8)',['물품목록번호','목록번호','g2b물품목록번호','g2b목록번호']],
+ ['department','보관 부서',['부서','부서명','보유부서','관리부서','사용부서']],
+ ['institutionName','원본 기관명 (대조용)',['기관명','기관','학교명','보유기관']],
+ ['classificationName','물품분류명',['물품분류명','분류명']],
  ['externalId','기관 자산번호',['자산번호','물품관리번호','관리번호','물품고유번호','자산관리번호']],
- ['originalName','대장 품명',['대장품명','물품명','품명','품목명','물품품명']],
- ['quantity','수량',['수량','보유수량','전환수량','불용수량','관리전환수량']],
+ ['originalName','대장 품명',['대장품명','물품명','품명','품목명','물품품명','g2b목록명','품명/규격','품명및규격']],
+ ['quantity','수량',['수량','보유수량','전환수량','불용수량','관리전환수량','등록수량']],
  ['classificationCode','물품분류번호',['물품분류번호','분류번호','세부물품분류번호','세부품명번호']],
  ['identificationCode','물품식별번호',['물품식별번호','식별번호','조달물품식별번호']],
  ['specification','규격 / 모델',['규격','모델명','모델','품목규격']],
@@ -66,7 +71,7 @@ export function parseWorkbook(bytes){
    return {name,rows,suggestedHeader:best.row+1,mapping:best.mapping,columns:range.e.c+1};
  });
  if(!sheets.some(s=>s.rows.length>1))err('가져올 표가 없습니다. 숨김 시트는 가져오지 않습니다.');
- const result={sheets};if(JSON.stringify(result).length>4*1024*1024)err('본문이 너무 큽니다. 불필요한 열을 제거하세요.');return result;
+ const result={sheets};if(JSON.stringify(result).length>4*1024*1024)err('본문이 너무 큽니다. 불필요한 열을 제거하세요.');const pictures=extractWorkbookImages(bytes,sheets.map(s=>s.name));return {...result,...pictures};
 }
 export function parseWorkbookIsolated(bytes){return new Promise((resolve,reject)=>{
  const worker=new Worker(new URL(import.meta.url),{workerData:bytes,resourceLimits:{maxOldGenerationSizeMb:192},execArgv:[]});
