@@ -6,6 +6,10 @@ import type {FileRecord} from '../types';
 import {STATES} from '../types';
 export function PageHead({title,description,action,back}:{title:string;description?:string;action?:ReactNode;back?:string}){return <header className="page-heading">{back?<a className="back-link" href={'#'+back}><ArrowLeft size={18}/>돌아가기</a>:null}<div className="heading-row"><div><h1>{title}</h1>{description?<p>{description}</p>:null}</div>{action}</div></header>;}
 export function Notice({children,tone='info'}:{children:ReactNode;tone?:'info'|'warning'|'success'}){return <div className={'notice '+tone} role={tone==='warning'?'alert':undefined}>{tone==='success'?<CheckCircle2 size={20}/>:<AlertCircle size={20}/>}<div>{children}</div></div>;}
+// 물품·주고받기 상태 13개를 7단계 진행 표시 하나로 (docs/DESIGN_SYSTEM.md)
+const PROGRESS=['등록','검토','나눔','신청·배정','인계','인수','완료'];
+const PROGRESS_AT:Record<string,number>={DRAFT:0,REVIEW:1,PUBLISHED:2,PAUSED:2,CLOSED:2,REQUESTED:3,RESERVED:3,DECLINED:3,CANCELLED:3,SENT:4,RECEIVED:5,DISPUTED:5,DONE:7};
+export function Progress({state,compact}:{state:string;compact?:boolean}){const at=PROGRESS_AT[state]??0,stop=state==='DISPUTED',ended=['PAUSED','CLOSED','DECLINED','CANCELLED'].includes(state);const cls=(i:number)=>i<at?'done':i===at?(stop?'stop':ended?'ended':'now'):'';return compact?<span className="progress-mini" aria-hidden="true">{PROGRESS.map((p,i)=><i key={p} className={cls(i)}/>)}</span>:<ol className="progress" aria-label={'진행 단계: '+(STATES[state]||state)}>{PROGRESS.map((p,i)=><li key={p} className={cls(i)} aria-current={i===at?'step':undefined}><i/>{p}</li>)}</ol>;}
 export function Badge({state,children}:{state?:string;children?:ReactNode}){return <span className={'badge state-'+(state||'info')}>{children||STATES[state||'']||state}</span>;}
 export function Empty({title='아직 등록된 내용이 없습니다',description,action}:{title?:string;description?:string;action?:ReactNode}){return <section className="empty"><Box size={42}/><h3>{title}</h3><p>{description}</p>{action}</section>;}
 export function Loading(){return <div className="loading" role="status"><LoaderCircle className="spin"/>불러오는 중입니다</div>;}

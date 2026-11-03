@@ -112,3 +112,43 @@ input:not([type=checkbox]):focus,select:focus,textarea:focus{border-color:var(--
   .demo-banner{font-size:var(--fs-xs)}
 }
 @media(prefers-reduced-motion:reduce){.lot-card{transition:none}}
+
+/* ── 개선안 1단계: 홈 「오늘 할 일」 · 7단계 진행 표시 · 카드 보강 · 로고 ── */
+.brand-mark{overflow:hidden;background:none}
+.brand-mark img{width:100%;height:100%;display:block}
+.mobile-brand img{border-radius:7px}
+.home-tasks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-bottom:16px}
+.home-task{display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--primary);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-1);color:var(--ink)}
+.home-task:hover{box-shadow:var(--shadow-2);color:var(--ink)}
+.home-task.tone-amber{border-left-color:#c27a0e}.home-task.tone-blue{border-left-color:#2d5d8a}.home-task.tone-red{border-left-color:var(--bad)}
+.home-task-label{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);font-weight:700;color:var(--muted)}
+.home-task strong{font-size:32px;line-height:1.15;font-weight:800}
+.home-task strong small{font-size:14px;font-weight:600;color:var(--muted);margin-left:3px}
+.home-task-who{font-size:var(--fs-sm);color:var(--ink-2);min-height:2.6em}
+.home-task .button{align-self:flex-start;margin-top:6px}
+.home-waiting{display:flex;flex-direction:column;gap:2px;background:var(--primary-soft);color:#1e4d3f;border-radius:var(--radius);padding:10px 14px;font-size:var(--fs-sm);margin-bottom:16px}
+.home-columns{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px}
+.home-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 18px;box-shadow:var(--shadow-1);min-width:0}
+.home-panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.home-panel-head h2{font-size:var(--fs-md);margin:0}
+.home-panel-head a{font-size:var(--fs-sm);color:var(--muted)}
+.home-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line);color:var(--ink)}
+.home-row:first-of-type{border-top:0}
+.home-row>img,.home-row>.work-photo{width:52px;height:52px;border-radius:10px;object-fit:cover;background:#eef2ee;display:grid;place-items:center;color:var(--faint)}
+.home-row b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-row span{font-size:var(--fs-xs);color:var(--muted)}
+.home-foot{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--muted);margin-top:14px}
+.progress{display:flex;list-style:none;margin:0 0 20px;padding:14px 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.progress li{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--muted);text-align:center;position:relative}
+.progress li i{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);background:var(--surface);z-index:1}
+.progress li+li::before{content:"";position:absolute;top:8px;right:50%;width:100%;height:2px;background:#dfe6e1}
+.progress li.done i{background:var(--primary);border-color:var(--primary)}
+.progress li.done+li::before{background:var(--primary)}
+.progress li.now{color:var(--primary);font-weight:800}.progress li.now i{border-color:var(--primary);box-shadow:0 0 0 4px var(--primary-soft)}
+.progress li.stop{color:var(--bad);font-weight:800}.progress li.stop i{border-color:var(--bad);background:var(--bad-soft);box-shadow:0 0 0 4px var(--bad-soft)}
+.progress li.ended{color:var(--faint);font-weight:700}.progress li.ended i{border-style:dashed}
+.progress-mini{display:flex;gap:3px;margin-top:5px;max-width:200px}
+.progress-mini i{height:4px;flex:1;border-radius:2px;background:#dfe6e1}
+.progress-mini i.done{background:var(--primary)}.progress-mini i.now{background:var(--primary-line)}.progress-mini i.stop{background:var(--bad)}.progress-mini i.ended{background:var(--line-strong)}
+.verified-tag{position:absolute;left:10px;top:10px;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.94);color:var(--ok);font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px}
+@media(max-width:800px){.home-columns{grid-template-columns:minmax(0,1fr)}.progress{padding:12px 4px}.progress li{font-size:10.5px}}
