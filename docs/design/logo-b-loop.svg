@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="물품이음 로고 시안 B: 다시 쓰는 상자">
+  <rect width="64" height="64" rx="16" fill="#147d64"/>
+  <path d="M20 27l12-6 12 6v12l-12 6-12-6z" fill="#fff"/>
+  <path d="M20 27l12 6 12-6M32 33v12" fill="none" stroke="#147d64" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M13 32a19 19 0 0 1 31-14.7" fill="none" stroke="#bfe0d3" stroke-width="4" stroke-linecap="round"/>
+  <path d="M44 11v7h-7" fill="none" stroke="#bfe0d3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M51 32a19 19 0 0 1-31 14.7" fill="none" stroke="#bfe0d3" stroke-width="4" stroke-linecap="round"/>
+  <path d="M20 53v-7h7" fill="none" stroke="#bfe0d3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
