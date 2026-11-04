@@ -2,7 +2,55 @@
 
 사용자가 2026-10-31에 지정한 대상은 **NAS 볼륨2 + Cloudflare + trade.h19h19.com**이다. 기관 운영 승인은 없으므로 합성 자료 시연으로 구성한다. 외부 API·AI의 실제 연결 상태는 아래 최신 배포 기록을 따른다.
 
-## 최신 v0.7.1 — 파일 등록·대화창·기존 NAS 보존 통합 (2026-11-04)
+## 최신 v0.9 — 사용자 OZD 직접 변환·기존 대기 재개 (2026-11-04)
+
+[https://trade.h19h19.com](https://trade.h19h19.com)에 앱 소스 **`92ad038802ac07f32d3a8b19c40f544cf0a99ce5`**를 배포했다. main `01b4ecca51d09e20e26794df6ce02c0c62d83baf`에 기존 개선사항·Hive RAG·서버 보안·중단 버튼 수정·회귀검사를 보존한 통합이다. 중단된 v0.8 작업은97381f0에 보존했으며 NAS에 배포하지 않았다. 별도 OZ Viewer·HTML5 SDK·변환 서버를 설치하지 않았고 OZD_LEGACY_BRIDGE_FALLBACK는false다. 코드 배포 이후 운영 기록만 변경한 문서 커밋은 재배포하지 않는다.
+
+| 항목 | 실제 확인값 |
+|---|---|
+| 현재 링크 / 이미지 | `/volume2/docker/trade/current` → `releases/92ad038` / `mulppum-ieum:92ad038` |
+| 이미지 ID | `sha256:94e65d2bb893b7b44f996b4074cff92f5ab0a79b2012bb88cd64225fd5b1b6ef` |
+| 앱 / 상태 | `mulppum-ieum-app-1`, v0.9.0, HTTPS, Docker healthy |
+| DB / uploads | `/volume2/docker/trade/demo-data/trade.sqlite` / 같은 경로 `uploads/`, 기존 경로 유지 |
+| 사용량 / RAG | 같은 DATA_DIR의 `rag-usage.sqlite`, 기존 corpus 읽기 전용 마운트 유지 |
+| 자료팩 경로 | `/volume2/docker/trade/knowledge/v0.5-20261101-9d7f2b4ffcd7/trade-rag-private-v05` → `/app/rag-private` |
+| RAG 실제 모델 | Hive `deepseek-ai/deepseek-v4.1-flash-1017`, 실응답 반환ID 일치 |
+| 포트 / 네트워크 | `127.0.0.1:14310` → 4310, `mulppum-ieum_default`, `10.253.43.0/28`, 기존 ID 유지 |
+| 비공개 배포 기록 | `/volume2/docker/trade/deployments/v09-2026-11-04T06-20-22Z` |
+
+기존 NAS 소스165개 파일의 SHA-256을522526d와 비교해 현장 변경이 없음을 확인했다. `.env.nas`는 보호 백업 후 **TRADE_RELEASE만** 변경했다. 키 재요청·재발급·출력·커밋 없이 기존 조달청/Hive 설정을 재사용했다. RAG·사진AI·카카오 등24개 공급자 설정, Cloudflare 라우팅/커넥터, Docker 네트워크/서브넷·포트·데이터 마운트와 다른 실행 서비스65개 ID를 보존했다. 기존 DB·uploads·계정·원본을 초기화하거나 삭제하지 않았다.
+
+### 선행 백업·schema6·새 경로 복원
+
+NAS의 기존 통합 schema5와 main v0.9 schema5는 다른 테이블 구성이다. [V09_MIGRATION.md](V09_MIGRATION.md)에 따라 통합 schema6으로27개 테이블을 사용한다. 기존26개 테이블 전체 행·트리거를 보존하고 import_document_exports만 추가했다. main v0.9 schema5의 기존 변환BLOB도 유지한다. 두 schema5 변형·재오픈 멱등 검사와 실제 복원/업무검사를 통과했다.
+
+아래 경로의 부모는 `/volume2/docker/trade/`다. 앱만 중지해 일관된 백업을 만들었다.
+
+| 대상 | 백업 | 별도 새 경로 복원 |
+|---|---|---|
+| 먼저 검증한 schema5 DB·첨부 | `backups/2026-11-04T06-21-36Z-v09-pre` | `restore-checks/2026-11-04T06-21-36Z-v09-migrated`와 같은시각 `-rollback` |
+| 교체 직전 DB·첨부 | `backups/2026-11-04T06-34-14Z-v09-pre` | `restore-checks/2026-11-04T06-34-14Z-v09-migrated` (schema6) / 같은시각 `-rollback` (schema5) |
+| 호출량·자료 ZIP | `rag-backups/2026-11-04T06-34-14Z-v09-pre` | 사용량은 위 새 DATA_DIR, 자료는 `restore-checks/2026-11-04T06-34-14Z-v09-corpus/trade-rag-private-v05` |
+| 검수 후 DB·첨부 | `backups/2026-11-04T06-38-21Z-v09-post` | `restore-checks/2026-11-04T06-38-21Z-v09-post` |
+| 검수 후 호출량 | `rag-backups/2026-11-04T06-38-21Z-v09-post` | 위 검수 후 DATA_DIR의 `rag-usage.sqlite` |
+
+첫 백업에서 schema5/26개 테이블·첨부18개·계정7개·사용량3행/29회를 새 경로에 복원하고 모든 행/첨부 해시·무결성을 확인한 뒤 기존 앱을 재가동했다. 새 이미지 검사 후 교체 직전 다시 백업해 복원본만 schema6으로 전환했다. 기존 모든 행이 동일함을 확인하고 복원본에서 로그인·기존 물품/사진·기관격리·수량배분/배송·개선사항·RAG를 HTTP로 검증했다. 실제 DB 전환 직후에도 기존26개 테이블의 모든 행이 동일했다. 자료 ZIP SHA-256/CRC와 별도 복원129개 파일 해시가 일치했다.
+
+실제 OZD 검수 후에는27개 테이블 모든 행·첨부18개·계정7개·원본2개(OZD1개)·변환XLSX1개·기존 참고사진1개·RAG사용량30회를 다시 백업/복원했다. 원본/변환/사진BLOB와 모든 첨부/사용량 해시가 동일하고 참조/무결성 검사도 통과했다. 복원본의 네트워크 없는 시험 HTTP 서버에서 기존 업무/파일권한을 재검사했다. 실제 앱도 재시작해 정상응답을 확인했다.
+
+롤백은 먼저 현재 schema6 데이터와 새 변환 결과를 보존한 뒤 교체 전 schema5 백업을 **존재하지 않는 새 DATA_DIR**에 복원해522526d 이미지와 연결한다. 구버전이 schema6을 거부하는 것을 확인했다. 현재 DB를 지우거나 그 파일에 구버전을 직접 실행하지 않는다. schema6에서 생성한 초안·변환 결과는 이전 백업에 없으므로 별도 대조한다. 동일 NAS 복원 검증과 별도 저장소 재해복구는 구분한다.
+
+### 실제 OZD·API·화면 결과
+
+- Node24 `npm ci`·macOS 서버150개·TypeScript/Vite 빌드·Chrome E2E27개, NAS Linux 빌드·서버150개 통과. 전체 Playwright는 한 번에 하나만 실행했다.
+- 사용자가 기존 NAS에 보관한12,380바이트 OZD는 **1행/수량1개**로 직접 변환됐다. 독립 Python PC1/struct/gzip 판독 원시값과 생성 XLSX9셀 전체가 동일했다. 기존20행/134개 XLSX는 다른 목록이므로 같은 목록으로 행별 비교하지 않았다. 공개 표본15행/165개나 미확인13,505바이트 첨부의 결과로 바꿔 보고하지 않는다.
+- 실제 파일 드래그→변환 완료→변환 엑셀 받기→미리보기→1비공개 초안→조달청 실조회/정확번호 빈칸 입력→상세페이지는 별도 비공개 로컬 서버에서 검사했다. 실제 NAS에서는 기존 대기 파일의 이력→직접 변환 다시 시도로 재첨부 없이 처리하고, 같은9셀·원본 해시·다운로드·비공개 초안·조달 보완을 다시 확인했다. 실제 기관 원문/행/생성XLSX/검수DB/캡처를 Git·공개CI·외부 변환 사이트/AI에 넣지 않았다.
+- 원본의 품명·번호·수량·취득일·단가·폐품 표기를 보존하고 DRAFT/UNVERIFIED/UNKNOWN·가용0을 유지했다. 조달청 실제0건 후에도 원본 스냅샷/변환XLSX 해시가 유지됐다. 다른기관의 원본/변환 다운로드는404, 시스템관리자는403이다. 게시/증빙/독립검토 관문을 제거하지 않았다.
+- 기존 Hive1017로 공개 프로그램 질문의 실제 답변·근거ID·새 네이티브 안내를 확인했다. 본문 인용표식 없음·참고자료 기본접힘·1440px/390px·121문서/8,164구간을 확인했다. PC1 저작자 표시가 설정 화면에 보인다. 모델·키·사진AI·카카오 설정을 바꾸지 않았다.
+
+지원은 비밀번호 없는 OZP3.0.0.1/SDM2040/ByteArraySet 소요조회 단일 표다. 다른 버전·암호·손상·다중표·이미지형 보고서는 추측/부분등록하지 않는다. 보고서 레이아웃·사진·스크립트 계산/표시값은 재현하지 않는다. 정확한 범위와 실제 결과는 [V09_COMPLETION.md](V09_COMPLETION.md)를 따른다. 기관 정식 운영 승인·별도 저장소 백업, 기존 미연결 외부 기능과 배송 시연 단가 제한은 남아 있다.
+
+## 이전 v0.7.1 — 파일 등록·대화창·기존 NAS 보존 통합 (2026-11-04)
 
 [https://trade.h19h19.com](https://trade.h19h19.com)의 실제 앱 소스는 **`522526d92e8b47b71c976413397af69d128c3223`**이다. 최신 main `c9fdbe11421828759f780870bd36b010d91bdc35`에 기존 NAS의 개선사항·Hive1017 RAG·조달 실접속/참고사진 보안 수정을 보존해 통합했다. 기능 코드 배포 뒤 운영 기록만 수정한 문서 커밋은 이미지에 재배포하지 않는다. 자세한 검수는 [V071_COMPLETION.md](V071_COMPLETION.md), 선행 복구 계획은 [V071_MIGRATION.md](V071_MIGRATION.md)를 따른다.
 
