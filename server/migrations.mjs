@@ -1,8 +1,8 @@
 /** Additive v2 migration; never rebuild or reset existing business tables. */
 export function migrateEnhancements(db) {
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
-  if(version>4)throw new Error('Database version is newer than this application. Do not downgrade.');
-  if(version===4)return;
+  if(version>5)throw new Error('Database version is newer than this application. Do not downgrade.');
+  if(version===5)return;
   if(version<2){
   db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS import_batches(
@@ -47,6 +47,7 @@ export function migrateEnhancements(db) {
     CREATE INDEX IF NOT EXISTS idx_import_images_batch ON import_images(batch_id);
     PRAGMA user_version=3;COMMIT;`);
   }
+  if(version<4){
   db.exec(`BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS import_documents(
       batch_id TEXT PRIMARY KEY REFERENCES import_batches(id), kind TEXT NOT NULL,
@@ -54,5 +55,12 @@ export function migrateEnhancements(db) {
       derived_name TEXT NOT NULL, method TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     PRAGMA user_version=4;
     COMMIT;`);
+
+  }
+  db.exec(`BEGIN IMMEDIATE;
+    CREATE TABLE IF NOT EXISTS import_document_exports(
+      batch_id TEXT PRIMARY KEY REFERENCES import_documents(batch_id),
+      bytes BLOB NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL);
+    PRAGMA user_version=5;COMMIT;`);
 
 }

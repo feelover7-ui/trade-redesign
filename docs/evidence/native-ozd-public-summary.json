@@ -1,0 +1,11 @@
+{
+  "sample": "Public education office demand-list OZD (not user attachment)",
+  "sourceUrl": "https://open.gwe.go.kr/main/bbs/view.do?bbsSn=29593&key=m2307210722956",
+  "sourceBytes": 13256,
+  "sourceSha256": "59f578d4edf721b0a92f213371430c9e41e5932086b94086f60ca3b2321de041",
+  "rows": 15,
+  "totalQuantity": 165,
+  "comparedCells": 135,
+  "allFieldsEqual": true,
+  "externalConversionCalls": 0
+}

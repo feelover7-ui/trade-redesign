@@ -17,7 +17,7 @@ import {uid,now} from '../server/db.mjs';
 import {productFingerprint,applySuggestion} from '../server/enhancements.mjs';
 import * as svc from '../server/service.mjs';
 const token='synthetic-bridge-token-at-least-32-characters';
-const bridgeEnv={OZD_BRIDGE_ENABLED:'true',OZD_BRIDGE_APPROVED:'true',OZD_BRIDGE_URL:'http://127.0.0.1:4318/convert',OZD_BRIDGE_TOKEN:token};
+const bridgeEnv={OZD_LEGACY_BRIDGE_FALLBACK:'true',OZD_BRIDGE_ENABLED:'true',OZD_BRIDGE_APPROVED:'true',OZD_BRIDGE_URL:'http://127.0.0.1:4318/convert',OZD_BRIDGE_TOKEN:token};
 const ozd=Buffer.from('OZP\x00SYNTHETIC_TEST_ONLY_NOT_A_REAL_OZD');
 function excel(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['합성 소요조회 테스트'],[],['G2B목록번호','G2B목록명','등록수량','취득일자','취득단가','물품상태'],['56101703-00001234','책상, 합성제조사, TEST-100, 1000×500×700mm',31,43385,141000,'폐품'],['56101703-00001234','책상, 합성제조사, TEST-100, 1000×500×700mm',2,43386,150000,'폐품']]),'소요조회');return XLSX.write(wb,{type:'buffer',bookType:'xlsx'});}
 const converted=(bytes=excel(),hash=sha256(ozd),type=XLSX_MIME)=>new Response(bytes,{headers:{'Content-Type':type,'X-Source-SHA256':hash}});

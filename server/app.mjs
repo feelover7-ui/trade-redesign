@@ -22,8 +22,8 @@ export function createApp(db,{dataDir=resolve(process.env.DATA_DIR||'./data'),or
   const cookie=(token,age=28800)=>`trade_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure?'; Secure':''}`;
   app.use((req,res,next)=>{res.set({'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'geolocation=(), microphone=()','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"});if(req.path.startsWith('/api'))res.set('Cache-Control','no-store');if(origin.startsWith('https://')&&req.get('X-Forwarded-Proto')?.split(',')[0].trim()==='http')return res.redirect(308,origin+req.originalUrl);next();});
   app.use(express.json({limit:'2mb'}));
-  app.get('/api/health',(req,res)=>res.json({ok:true,version:'0.8.0'}));
-  app.get('/api/meta',(req,res)=>res.json({demo,capabilities,version:'0.8.0'}));
+  app.get('/api/health',(req,res)=>res.json({ok:true,version:'0.9.0'}));
+  app.get('/api/meta',(req,res)=>res.json({demo,capabilities,version:'0.9.0'}));
   app.post('/api/auth/login',throttle(),(req,res)=>{protectWrite(req,origin);const d=z.object({email:z.string().email().max(320),password:z.string().min(1).max(200)}).parse(req.body);const user=db.prepare('SELECT u.*,o.name AS org_name,o.district,o.active AS org_active FROM users u JOIN organizations o ON o.id=u.org_id WHERE email=?').get(d.email.toLowerCase().trim());const saved=user?.password_hash||'00000000000000000000000000000000:'+ '00'.repeat(64);const correct=verifyPassword(d.password,saved);must(user&&user.active&&user.org_active&&correct,'이메일 또는 비밀번호를 확인하세요.',401,'INVALID_LOGIN');const session=createSession(db,user.id);audit(db,user,'LOGIN',user.id);res.set('Set-Cookie',cookie(session.token));res.json({user:publicUser(user),csrf:session.csrf});});
   app.use('/api',requireAuth(db));
   app.use('/api',(req,res,next)=>{protectWrite(req,origin);next();});
