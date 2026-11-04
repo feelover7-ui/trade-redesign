@@ -8,19 +8,28 @@ import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,isAbsolute} from 'node:path';
 import {spawn} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
+import {html5Status} from './html5-converter.mjs';
 import {assertOzd,MAX_DOCUMENT_BYTES,XLSX_MIME,sha256} from '../../server/ozd-converter.mjs';
 
 function settings(env){
+ if(env.OZD_ENGINE_KIND==='OZ_HTML5'){
+  const vendor=html5Status(env);
+  return {executable:process.execPath,
+   args:[fileURLToPath(new URL('./html5-converter.mjs',import.meta.url)),'{input}','{output}'],
+   ready:vendor.ready,engineType:'OZ_HTML5',timeout:Math.min(75000,Math.max(5000,Number(env.OZD_ENGINE_TIMEOUT_MS)||65000)),
+   forwardEnv:Object.fromEntries(['OZD_ENGINE_APPROVED','OZD_HTML5_LICENSE_CONFIRMED','OZD_HTML5_ASSET_DIR','OZD_HTML5_BROWSER_PATH','OZD_HTML5_SCRIPTS_JSON','OZD_HTML5_STYLES_JSON','OZD_HTML5_TIMEOUT_MS','PLAYWRIGHT_BROWSERS_PATH'].filter(k=>env[k]!==undefined).map(k=>[k,env[k]]))};
+ }
  let args=[];try{args=JSON.parse(env.OZD_CONVERTER_ARGS_JSON||'[]');}catch{}
  const executable=env.OZD_CONVERTER_EXECUTABLE||'';
  const ready=env.OZD_ENGINE_APPROVED==='true'&&isAbsolute(executable)&&existsSync(executable)&&Array.isArray(args)&&args.every(a=>typeof a==='string'&&a.length<4096)&&args.some(a=>a.includes('{input}'))&&args.some(a=>a.includes('{output}'));
- return {executable,args,ready,timeout:Number.isFinite(Number(env.OZD_ENGINE_TIMEOUT_MS))&&Number(env.OZD_ENGINE_TIMEOUT_MS)>0?Math.min(75000,Math.max(1000,Number(env.OZD_ENGINE_TIMEOUT_MS))):45000};
+ return {executable,args,ready,engineType:'EXTERNAL_EXECUTABLE',forwardEnv:{},timeout:Number.isFinite(Number(env.OZD_ENGINE_TIMEOUT_MS))&&Number(env.OZD_ENGINE_TIMEOUT_MS)>0?Math.min(75000,Math.max(1000,Number(env.OZD_ENGINE_TIMEOUT_MS))):45000};
 }
 async function execute(config,input,output,jobDir){
  const args=config.args.map(a=>a.replaceAll('{input}',input).replaceAll('{output}',output));
  // Only the configured executable, never shell text or client-supplied arguments.
  const safeEnv={};for(const key of ['PATH','Path','HOME','USERPROFILE','SystemRoot','WINDIR','TEMP','TMP','TMPDIR','PROGRAMDATA','APPDATA','LOCALAPPDATA','OZ_LICENSE_FILE'])if(process.env[key])safeEnv[key]=process.env[key];
+ Object.assign(safeEnv,config.forwardEnv||{});
  await new Promise((resolve,reject)=>{
   const child=spawn(config.executable,args,{shell:false,cwd:jobDir,windowsHide:true,detached:process.platform!=='win32',stdio:'ignore',env:safeEnv});
   let timedOut=false;
@@ -36,7 +45,7 @@ export function createOzdBridge({env=process.env,runner=execute}={}){
  const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(data));};
  const server=createServer(async(req,res)=>{
   if(req.headers.origin||!equal(String(req.headers.authorization||''),'Bearer '+token)){req.resume();return json(res,401,{error:'UNAUTHORIZED'});}
-  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,engineConfigured:config.ready,contract:'trade-ozd-xlsx-v1'});
+  if(req.method==='GET'&&req.url==='/health')return json(res,200,{ok:true,engineConfigured:config.ready,engineType:config.engineType,contract:'trade-ozd-xlsx-v1'});
   if(req.method!=='POST'||req.url!=='/convert'){req.resume();return json(res,404,{error:'NOT_FOUND'});}
   if(!config.ready){req.resume();return json(res,503,{error:'ENGINE_NOT_CONFIGURED'});}
   if(active){req.resume();return json(res,429,{error:'BUSY'});}

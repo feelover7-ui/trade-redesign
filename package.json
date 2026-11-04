@@ -1,6 +1,6 @@
 {
   "name": "mulppum-ieum",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,8 @@
     "restore": "node scripts/restore.mjs",
     "preflight": "node --env-file-if-exists=.env scripts/preflight.mjs",
     "rag:check": "node --env-file-if-exists=.env scripts/rag-check.mjs",
-    "ozd:bridge": "node --env-file-if-exists=.env.ozd tools/ozd-bridge/server.mjs"
+    "ozd:bridge": "node --env-file-if-exists=.env.ozd tools/ozd-bridge/server.mjs",
+    "ozd:html5:check": "node tools/ozd-bridge/check-html5.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
@@ -28,6 +29,7 @@
     "lucide-react": "^0.468.0",
     "multer": "^2.0.2",
     "papaparse": "^5.5.3",
+    "playwright-core": "1.64.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "10.1.0",
