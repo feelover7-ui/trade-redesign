@@ -1,3 +1,4 @@
+import {importAvailability} from './import-lifecycle.mjs';
 import {z} from 'zod';
 import {join} from 'node:path';
 import {writeFileSync,unlinkSync} from 'node:fs';
@@ -14,7 +15,7 @@ export async function saveImportImages(db,batchId,images){
  transaction(db,()=>{for(const p of safe)db.prepare('INSERT INTO import_images VALUES(?,?,?,?,?,?,?,?,?,NULL)').run(uid(),batchId,p.sheet,p.row,p.endRow,p.col,p.name,p.bytes,hash(p.bytes));});
  return importImageList(db,batchId);
 }
-export function uploadView(db,batch){const workbook=batch.workbook;return {id:batch.id,name:batch.name,fields:IMPORT_FIELDS.map(([key,label])=>({key,label})),sheets:workbook.sheets.map(s=>({...s,rows:s.rows.slice(0,35),rowCount:s.rows.length})),images:importImageList(db,batch.id),warnings:workbook.warnings||[]};}
+export function uploadView(db,batch){const workbook=batch.workbook;return {id:batch.id,name:batch.name,inputFormat:workbook.inputFormat||'EXCEL',conversion:workbook.conversion||{state:'READY',method:'LEGACY'},fields:IMPORT_FIELDS.map(([key,label])=>({key,label})),sheets:workbook.sheets.map(s=>({...s,rows:s.rows.slice(0,35),rowCount:s.rows.length})),images:importImageList(db,batch.id),warnings:workbook.warnings||[]};}
 export function attachImportImages(db,user,batchId,input,dataDir){
  svc.business(user);const batch=db.prepare('SELECT * FROM import_batches WHERE id=? AND org_id=?').get(batchId,user.org_id);must(batch,'본 기관 업로드만 이용할 수 있습니다.',404);
  const d=z.object({physicalConfirmed:z.literal(true),privacyConfirmed:z.literal(true),images:z.array(z.object({id:z.string().uuid(),rowNumber:z.number().int().min(1).max(2040)})).min(1).max(30)}).parse(input);
@@ -37,8 +38,8 @@ export function attachImportImages(db,user,batchId,input,dataDir){
  });}catch(e){for(const path of written){try{unlinkSync(path);}catch{}}throw e;}
 }
 export function mountInventoryTools(app,db,{dataDir}){
- app.get('/api/imports',(req,res)=>{svc.business(req.user);const offset=z.coerce.number().int().min(0).max(100000).parse(req.query.offset??0);const batches=db.prepare('SELECT id,name,file_hash,created_at FROM import_batches WHERE org_id=? ORDER BY created_at DESC LIMIT 30 OFFSET ?').all(req.user.org_id,offset);
-  res.json({items:batches.map(b=>({...b,expired:Date.now()-Date.parse(b.created_at)>86400000,lotIds:db.prepare('SELECT DISTINCT lot_id FROM imported_rows WHERE org_id=? AND file_hash=?').all(req.user.org_id,b.file_hash).map(r=>r.lot_id),images:db.prepare('SELECT COUNT(*) AS n FROM import_images WHERE batch_id=?').get(b.id).n})),nextOffset:batches.length===30?offset+30:null});
+ app.get('/api/imports',(req,res)=>{svc.business(req.user);const offset=z.coerce.number().int().min(0).max(100000).parse(req.query.offset??0);const batches=db.prepare("SELECT id,name,file_hash,created_at,json_extract(workbook,'$.inputFormat') AS inputFormat,json_extract(workbook,'$.conversion.state') AS conversionState,json_extract(workbook,'$.conversion.readyAt') AS readyAt FROM import_batches WHERE org_id=? ORDER BY created_at DESC LIMIT 30 OFFSET ?").all(req.user.org_id,offset);
+  res.json({items:batches.map(b=>({...b,...importAvailability({createdAt:b.created_at,inputFormat:b.inputFormat,conversionState:b.conversionState,readyAt:b.readyAt}),lotIds:db.prepare('SELECT DISTINCT lot_id FROM imported_rows WHERE org_id=? AND file_hash=?').all(req.user.org_id,b.file_hash).map(r=>r.lot_id),images:db.prepare('SELECT COUNT(*) AS n FROM import_images WHERE batch_id=?').get(b.id).n})),nextOffset:batches.length===30?offset+30:null});
  });
  app.get('/api/imports/:id/resume',(req,res)=>res.json(uploadView(db,loadImport(db,req.user,req.params.id))));
  app.get('/api/imports/:id/images',(req,res)=>{svc.business(req.user);must(db.prepare('SELECT 1 FROM import_batches WHERE id=? AND org_id=?').get(req.params.id,req.user.org_id),'권한이 없습니다.',404);res.json(importImageList(db,req.params.id));});

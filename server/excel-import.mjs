@@ -1,4 +1,7 @@
+import {importAvailability} from './import-lifecycle.mjs';
 import {z} from 'zod';
+import {parseCatalogName} from './catalog-name.mjs';
+import * as XLSX from 'xlsx';
 import {splitListingNumber} from './catalog-identifiers.mjs';
 import {uid,now,must,audit,transaction} from './db.mjs';
 import {hash} from './auth.mjs';
@@ -8,8 +11,9 @@ import {IMPORT_FIELDS} from './excel-parser.mjs';
 
 const configSchema=z.object({sheet:z.string().min(1).max(100),headerRow:z.number().int().min(1).max(30),mapping:z.record(z.string(),z.number().int().min(0).max(63)),groupIdentical:z.boolean().default(false),department:z.string().trim().max(100).default('')});
 export function storeImport(db,user,name,bytes,workbook){business(user);const id=uid();db.prepare('INSERT INTO import_batches VALUES(?,?,?,?,?,?,?)').run(id,user.org_id,user.id,hash(bytes),name,JSON.stringify({...workbook,images:undefined}),now());audit(db,user,'EXCEL_PREVIEW',id,{fileHash:hash(bytes),name});return id;}
-export function loadImport(db,user,id){business(user);const b=db.prepare('SELECT * FROM import_batches WHERE id=? AND org_id=?').get(id,user.org_id);must(b,'본 기관의 업로드를 찾을 수 없습니다.',404);must(Date.now()-Date.parse(b.created_at)<86400000,'미리보기가 만료되었습니다. 원본 파일을 다시 올리세요.',410);return {...b,orgName:db.prepare('SELECT name FROM organizations WHERE id=?').get(user.org_id)?.name,workbook:JSON.parse(b.workbook)};}
+export function loadImport(db,user,id){business(user);const b=db.prepare('SELECT * FROM import_batches WHERE id=? AND org_id=?').get(id,user.org_id);must(b,'본 기관의 업로드를 찾을 수 없습니다.',404);const workbook=JSON.parse(b.workbook);const availability=importAvailability({createdAt:b.created_at,inputFormat:workbook.inputFormat,conversionState:workbook.conversion?.state,readyAt:workbook.conversion?.readyAt});must(!availability.expired,'미리보기가 만료되었습니다. 원본 파일을 다시 올리세요.',410);return {...b,...availability,orgName:db.prepare('SELECT name FROM organizations WHERE id=?').get(user.org_id)?.name,workbook};}
 export function previewImport(batch,input){
+ must(batch.workbook.conversion?.state!=='WAITING','OZD 변환을 완료한 뒤 미리보기와 등록을 진행하세요.',409);
  const config=configSchema.parse(input);const sheet=batch.workbook.sheets.find(s=>s.name===config.sheet);must(sheet,'시트를 확인하세요.');
  const keys=new Set(IMPORT_FIELDS.map(x=>x[0]));must(Object.keys(config.mapping).every(k=>keys.has(k)),'지원하지 않는 매핑 항목입니다.');
  must(config.mapping.originalName!==undefined&&config.mapping.quantity!==undefined,'품명과 수량 열을 연결하세요.');
@@ -26,7 +30,9 @@ export function previewImport(batch,input){
   const values={};for(const [key]of IMPORT_FIELDS)values[key]=text(key);
   values.quantity=typeof cell('quantity').value==='number'?cell('quantity').value:Number(text('quantity').replaceAll(',',''));
   for(const key of ['acquiredDate','decisionDate'])if(cell(key).date)values[key]=cell(key).date;else if(/^\d{4}[./-]\d{1,2}[./-]\d{1,2}\.?$/.test(values[key])){const p=values[key].split(/[./-]/);values[key]=`${p[0]}-${p[1].padStart(2,'0')}-${p[2].padStart(2,'0')}`;}
+  for(const key of ['acquiredDate','decisionDate'])if(!cell(key).date&&typeof cell(key).value==='number'&&cell(key).value>=20000&&cell(key).value<=100000){const date=XLSX.SSF.parse_date_code(cell(key).value);if(date)values[key]=`${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;}
   const issues=[];
+  if(values.acquiredUnitPrice.length>50||values.manufacturer.length>200||values.model.length>200)issues.push('단가·제조사·모델 값 길이를 확인하세요.');
   if(typeof cell('listingNo').value==='number')issues.push('16자리 물품목록번호는 숫자 저장 시 정밀도가 손실될 수 있습니다. 원본 번호를 확인해 텍스트 셀로 저장하세요.');
   if(values.classificationName.length>200)issues.push('물품분류명은 200자 이하로 입력하세요.');
   for(const key of ['acquiredDate','decisionDate'])if(/^\d{8}$/.test(values[key]))values[key]=values[key].slice(0,4)+'-'+values[key].slice(4,6)+'-'+values[key].slice(6);
@@ -43,8 +49,7 @@ export function previewImport(batch,input){
   values.sourceName=values.originalName;
   const nameHeader=sheet.rows[config.headerRow-1]?.[config.mapping.originalName]?.text?.replace(/\s/g,'').toLowerCase();
   if(['g2b목록명','품명/규격','품명및규격'].includes(nameHeader)&&values.originalName.includes(',')){
-   const cut=values.originalName.indexOf(',');values.specification ||= values.originalName.slice(cut+1).trim();
-   values.originalName=values.originalName.slice(0,cut).trim();
+   const parsed=parseCatalogName(values.originalName);values.specification ||= parsed.specification;values.manufacturer ||= parsed.manufacturer;values.model ||= parsed.model;values.originalName=parsed.title;
   }
   for(const [key,col]of Object.entries(config.mapping))if(cells[col]?.formula)issues.push(`${IMPORT_FIELDS.find(f=>f[0]===key)?.[1]}에 수식이 있습니다. 값으로 붙여넣은 파일을 사용하세요.`);
   if(values.originalName.length<2||values.originalName.length>200||values.sourceName.length>200)issues.push('품명을 2~200자로 확인하세요.');
@@ -61,7 +66,8 @@ export function previewImport(batch,input){
  const ids=new Set();for(const row of rows)if(row.externalId){if(ids.has(row.externalId))errors.push({row:row.rowNumber,messages:[`중복 기관 자산번호: ${row.externalId}`]});ids.add(row.externalId);}
  if(rows.some(r=>!r.externalId))warnings.push('기관 자산번호가 없는 행은 초안만 만듭니다. 실물 인계 전에 공식 자산행을 별도로 연결하세요.');
  if(rows.some(r=>!r.decisionRef))warnings.push('불용결정번호가 없는 물품은 비공개 초안이며 결정 증빙 확인 전 게시되지 않습니다.');
- warnings.push('엑셀 수량은 시작값입니다. 상태·실사·불용결정은 자동 승인하지 않습니다.');
+ if(rows.some(r=>/폐품|폐기/.test(r.condition)))warnings.push('원본에 폐품·폐기 상태가 있습니다. 이 값은 보존하며 재사용 적합성은 현물 검수와 별도 증빙 검토로 확인해야 합니다.');
+ warnings.push('파일 수량은 시작값입니다. 상태·실사·불용결정은 자동 승인하지 않습니다.');
  const groups=new Map();for(const r of rows){const key=config.groupIdentical&&r.decisionRef?JSON.stringify([r.originalName,r.identificationCode,r.classificationCode,r.specification,r.decisionRef,r.decisionDate,r.account,r.department]):String(r.rowNumber);const a=groups.get(key)||[];a.push(r);groups.set(key,a);}
  for(const g of groups.values())if(g.reduce((n,r)=>n+r.quantity,0)>100000)errors.push({row:g[0].rowNumber,messages:['묶음 합계는 100,000개 이내로 나누세요.']});
  return {config,rows,groups:[...groups.values()],errors,warnings,skipped,lotCount:groups.size,totalQuantity:rows.reduce((n,r)=>n+r.quantity,0)};
@@ -74,9 +80,9 @@ export function confirmImport(db,user,batchId,input){business(user);const batch=
   const lotIds=[];
   for(const group of plan.groups){
    const first=group[0],quantity=group.reduce((n,r)=>n+r.quantity,0);
-   const d={department:first.department,specification:first.specification,classificationName:first.classificationName,listingNo:first.listingNo,title:first.originalName.slice(0,100),category:'OTHER',manufacturer:'',model:'',description:first.specification?`엑셀 기재 규격: ${first.specification}`:'',actualCount:quantity,ledgerCount:quantity,decisionQty:quantity,decisionRef:first.decisionRef,decisionDate:first.decisionDate,sourceTargetReference:`${batch.name} / ${plan.config.sheet} / ${group.map(r=>r.rowNumber).join(', ')}행 (승인 대상 대조 필요)`.slice(0,1000),originalName:first.sourceName,classificationCode:first.classificationCode,identificationCode:first.identificationCode,mismatchNote:'',pickup:'수령기관 운반 · 상차 및 일정 별도 협의',needsWipe:false,specialReview:false,privacyChecked:false,groups:[{condition:'UNKNOWN',quantity,inspection:'NONE',note:'엑셀 등록 · 현물 상태/수량 확인 필요'}]};
+   const d={department:first.department,specification:first.specification,classificationName:first.classificationName,listingNo:first.listingNo,title:first.originalName.slice(0,100),category:'OTHER',manufacturer:first.manufacturer||'',model:first.model||'',description:first.specification?`엑셀 기재 규격: ${first.specification}`:'',actualCount:quantity,ledgerCount:quantity,decisionQty:quantity,decisionRef:first.decisionRef,decisionDate:first.decisionDate,sourceTargetReference:`${batch.name} / ${plan.config.sheet} / ${group.map(r=>r.rowNumber).join(', ')}행 (승인 대상 대조 필요)`.slice(0,1000),originalName:first.sourceName,classificationCode:first.classificationCode,identificationCode:first.identificationCode,mismatchNote:'',pickup:'수령기관 운반 · 상차 및 일정 별도 협의',needsWipe:false,specialReview:false,privacyChecked:false,groups:[{condition:'UNKNOWN',quantity,inspection:'NONE',note:'엑셀 등록 · 현물 상태/수량 확인 필요'}]};
    const id=saveLot(db,user,d);lotIds.push(id);
-   db.prepare('UPDATE lots SET source_snapshot=? WHERE id=?').run(JSON.stringify({...JSON.parse(db.prepare('SELECT source_snapshot FROM lots WHERE id=?').get(id).source_snapshot),source:'EDUFINE_EXCEL_IMPORT',fileHash:batch.file_hash,fileName:batch.name,sheet:plan.config.sheet,listingNo:first.listingNo,department:first.department,specification:first.specification,classificationName:first.classificationName,institutionName:first.institutionName,rowNumbers:group.map(r=>r.rowNumber)}),id);
+   db.prepare('UPDATE lots SET source_snapshot=? WHERE id=?').run(JSON.stringify({...JSON.parse(db.prepare('SELECT source_snapshot FROM lots WHERE id=?').get(id).source_snapshot),source:batch.workbook.inputFormat==='OZD'?'OZD_DOCUMENT_IMPORT':'EDUFINE_EXCEL_IMPORT',inputFormat:batch.workbook.inputFormat||'EXCEL',conversion:batch.workbook.conversion||null,originalRows:group.map(r=>({rowNumber:r.rowNumber,originalName:r.sourceName,quantity:r.quantity,acquiredDate:r.acquiredDate,acquiredUnitPrice:r.acquiredUnitPrice,acquiredAmount:r.acquiredPrice,condition:r.condition})),fileHash:batch.file_hash,fileName:batch.name,sheet:plan.config.sheet,listingNo:first.listingNo,department:first.department,specification:first.specification,classificationName:first.classificationName,institutionName:first.institutionName,rowNumbers:group.map(r=>r.rowNumber)}),id);
    const assetRows=group.filter(r=>r.externalId).map(r=>assetSchema.parse({...r,originalName:r.sourceName}));
    if(assetRows.length){importAssets(db,user,assetRows,batch.name);const ids=assetRows.map(r=>db.prepare('SELECT id FROM assets WHERE org_id=? AND external_id=?').get(user.org_id,r.externalId).id);bindAssets(db,user,id,ids);}
    for(const r of group)db.prepare('INSERT INTO imported_rows VALUES(?,?,?,?,?)').run(user.org_id,batch.file_hash,plan.config.sheet,r.rowNumber,id);

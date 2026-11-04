@@ -1,4 +1,5 @@
 import multer from 'multer';
+import {mountDocumentImports} from './document-import.mjs';
 import {createCatalogGateway} from './catalog-gateway.mjs';
 import {mountInventoryTools,saveImportImages,uploadView} from './inventory-tools.mjs';
 import {z} from 'zod';
@@ -18,14 +19,15 @@ import {referenceImage} from './reference-image.mjs';
 export const photoLabelSchema=z.object({productName:z.string().trim().max(100).default(''),purpose:z.enum(['OVERVIEW','NAMEPLATE','DEFECT','COMPONENT']).default('OVERVIEW')});
 export function savePhotoLabel(db,user,fileId,input){const d=photoLabelSchema.parse(input);db.prepare('INSERT INTO photo_metadata VALUES(?,?,?,?,?) ON CONFLICT(file_id) DO UPDATE SET product_name=excluded.product_name,purpose=excluded.purpose,updated_by=excluded.updated_by,updated_at=excluded.updated_at').run(fileId,d.productName,d.purpose,user.id,now());}
 export function productFingerprint(db,lotId){const row=svc.lotRow(db,lotId);const photos=db.prepare("SELECT f.id,f.sha256,m.product_name,m.purpose FROM files f LEFT JOIN photo_metadata m ON m.file_id=f.id WHERE f.lot_id=? AND f.kind='PHOTO' ORDER BY f.id").all(lotId);return hash(JSON.stringify({version:row.version,data:row.data,photos}));}
-export function applySuggestion(db,user,id,input){const d=z.object({fields:z.array(z.enum(['title','manufacturer','model','description','category','actualIdentificationCode','classificationName'])).min(1).max(7),version:z.number().int()}).parse(input);return transaction(db,()=>{
+export function applySuggestion(db,user,id,input){const d=z.object({fields:z.array(z.enum(['title','manufacturer','model','description','category','actualIdentificationCode','classificationName'])).min(1).max(7),version:z.number().int(),emptyOnly:z.boolean().default(false)}).parse(input);return transaction(db,()=>{
  const s=db.prepare('SELECT * FROM product_suggestions WHERE id=? AND org_id=?').get(id,user.org_id);must(s,'제안을 찾을 수 없습니다.',404);const row=svc.ownLot(db,user,s.lot_id);must(s.state==='PROPOSED'&&row.state==='DRAFT','초안에 아직 적용하지 않은 제안만 반영합니다.',409);must(row.version===d.version&&row.version===s.lot_version&&productFingerprint(db,row.id)===s.input_hash,'사진/초안이 바뀌었습니다. 최신 자료로 다시 분석하세요.',409,'STALE_SUGGESTION');
- const proposal=JSON.parse(s.payload),draft=JSON.parse(row.data);for(const key of d.fields){must(typeof proposal[key]==='string'&&proposal[key].length>0,'비어 있는 제안 항목은 반영할 수 없습니다.');draft[key]=proposal[key];}
+ const proposal=JSON.parse(s.payload),draft=JSON.parse(row.data);if(d.emptyOnly){must(s.source==='PROCUREMENT'&&proposal.matchType==='EXACT_IDENTIFIER','번호가 일치한 조달정보만 빈칸에 입력합니다.',409);must(d.fields.every(k=>['manufacturer','model','description','actualIdentificationCode','classificationName'].includes(k)&&!draft[k]),'이미 입력된 값이나 원본 항목은 일괄 변경하지 않습니다.',409);}for(const key of d.fields){must(typeof proposal[key]==='string'&&proposal[key].length>0,'비어 있는 제안 항목은 반영할 수 없습니다.');draft[key]=proposal[key];}
  svc.saveLot(db,user,{...draft,version:row.version},row.id);db.prepare("UPDATE product_suggestions SET state='APPLIED',applied_at=? WHERE id=?").run(now(),id);audit(db,user,'PRODUCT_SUGGESTION_APPLY',row.id,{suggestionId:id,fields:d.fields,source:s.source,officialFieldsUnchanged:true});return {id:row.id};
 });}
 export function mountEnhancements(app,db,{dataDir,env=process.env,fetcher=fetch,imageLoader=referenceImage}={}){
  mountInventoryTools(app,db,{dataDir});
  const catalog=createCatalogGateway(db,{env,fetcher});
+ mountDocumentImports(app,db,{env,fetcher});
  const external={env,fetcher},active=new Set(),routes=new Map();let parsing=0;
  const rate=env.SHIPPING_RATE_CARD_JSON?rateCardSchema.parse(JSON.parse(env.SHIPPING_RATE_CARD_JSON)):DEFAULT_RATE_CARD;
  const guard=(user,kind,limit=60)=>{svc.business(user);const since=new Date(Date.now()-3600000).toISOString();const n=db.prepare('SELECT COUNT(*) AS n FROM audit_events WHERE actor_id=? AND action=? AND created_at>?').get(user.id,kind,since).n;must(n<limit,'이 기능의 시간당 호출 한도를 넘었습니다.',429);audit(db,user,kind,user.id);};
