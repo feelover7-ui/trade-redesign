@@ -53,6 +53,13 @@ AI 답변은 일반 대화창 형태이며 출처는 답변 아래 **참고자�
 - [Codex 마무리 프롬프트](docs/CODEX_RAG_HANDOFF.md)
 - [RAG 검증 기록](docs/RAG_TEST_REPORT.md)
 
+## v0.7.1 후속 검수 — 2026-11-04
+
+v0.7의 엑셀/OZD 통합 등록·드래그 업로드·일반 AI 대화창을 유지합니다. OZD 변환 대기가 하루를 넘겨도 원본을 보존해 재개하며, 변환 완료부터 미리보기24시간을 계산합니다. 변환 전 원본 해시 검사와 Markdown 출처 링크 잔여문구 제거를 보강했습니다. API 키 실접속·OZ 엔진·기존 NAS 배포는 로컬 Codex 마무리이며, 코드 푸시만으로 배포 완료를 뜻하지 않습니다.
+
+- [Codex 최종 인계와 서브에이전트 역할 분담](docs/CODEX_V071_FINISH.md)
+- [후속 검수 기록](docs/V071_TEST_REPORT.md)
+
 ## 1. 가장 빠르게 실행하기
 
 **Node.js 24.x**와 Git이 필요합니다. macOS / Windows PowerShell / Linux에서 동일합니다.

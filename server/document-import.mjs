@@ -13,17 +13,18 @@ export function mountDocumentImports(app,db,{env=process.env,fetcher=fetch}={}){
  const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_DOCUMENT_BYTES,files:1,fields:2}}),active=new Set();let parsing=0;
  const guard=user=>{business(user);const n=db.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE actor_id=? AND action='DOCUMENT_IMPORT_REQUEST' AND created_at>?").get(user.id,new Date(Date.now()-3600000).toISOString()).n;must(n<30,'파일 처리의 시간당 한도를 넘었습니다.',429);must(parsing<2,'다른 파일을 분석 중입니다. 잠시 후 다시 시도하세요.',429);audit(db,user,'DOCUMENT_IMPORT_REQUEST',user.id);};
  const original=(batchId)=>db.prepare('SELECT * FROM import_documents WHERE batch_id=?').get(batchId);
+ const checkOriginal=source=>must(sha256(Buffer.from(source.bytes))===source.sha256,'원본 무결성 검사에 실패했습니다. 원본을 변경하지 말고 관리자에게 확인하세요.',409,'SOURCE_INTEGRITY_FAILED');
  const response=(id,user)=>uploadView(db,loadImport(db,user,id));
  function pending(id,message,code){const b=db.prepare('SELECT workbook FROM import_batches WHERE id=?').get(id);const w=JSON.parse(b.workbook);w.conversion={state:'WAITING',code,message};db.prepare('UPDATE import_batches SET workbook=? WHERE id=?').run(JSON.stringify(w),id);}
  async function finish(id,user,bytes,{kind,method,derivedName,inputHash}){
   // The original binary is immutable; derived XLSX must pass the existing isolated parser.
-  const workbook=await parseTable(bytes);workbook.inputFormat=kind;workbook.conversion={state:'READY',method,derivedName,outputHash:sha256(bytes)};
+  const workbook=await parseTable(bytes);workbook.inputFormat=kind;workbook.conversion={state:'READY',method,derivedName,outputHash:sha256(bytes),readyAt:now()};
   const images=await saveImportImages(db,id,workbook.images);
   if(images.length<(workbook.images||[]).length)workbook.warnings=[...(workbook.warnings||[]),'일부 삽입 사진을 안전하게 읽지 못했습니다. 현물사진을 별도로 첨부하세요.'];
   transaction(db,()=>{db.prepare('UPDATE import_batches SET workbook=? WHERE id=?').run(JSON.stringify({...workbook,images:undefined}),id);db.prepare('UPDATE import_documents SET derived_hash=?,derived_name=?,method=?,updated_at=? WHERE batch_id=?').run(sha256(bytes),derivedName,method,now(),id);audit(db,user,'DOCUMENT_PARSE_READY',id,{kind,method,inputHash,derivedHash:sha256(bytes),sheets:workbook.sheets.length});});
  }
  async function attemptOzd(id,user){
-  const batch=loadImport(db,user,id),source=original(id);must(source?.kind==='OZD','OZD 원본을 찾을 수 없습니다.',404);
+  const batch=loadImport(db,user,id),source=original(id);must(source?.kind==='OZD','OZD 원본을 찾을 수 없습니다.',404);checkOriginal(source);
   if(batch.workbook.conversion?.state==='READY')return;
   must(!active.has(id),'이 파일의 변환이 진행 중입니다.',409);active.add(id);
   try{const converted=await convertOzd(Buffer.from(source.bytes),{env,fetcher});await finish(id,user,converted.bytes,{kind:'OZD',method:converted.method,derivedName:batch.name.replace(/\.ozd$/i,'.xlsx'),inputHash:source.sha256});}
@@ -50,7 +51,7 @@ export function mountDocumentImports(app,db,{env=process.env,fetcher=fetch}={}){
  });
  app.post('/api/imports/:id/retry-conversion',async(req,res)=>{guard(req.user);parsing++;try{await attemptOzd(req.params.id,req.user);res.json(response(req.params.id,req.user));}finally{parsing--;}});
  app.post('/api/imports/:id/converted',upload.single('file'),async(req,res)=>{
-  guard(req.user);const batch=loadImport(db,req.user,req.params.id),source=original(batch.id);must(source?.kind==='OZD','OZD 원본에만 변환 엑셀을 연결합니다.',400);must(batch.workbook.conversion?.state!=='READY','이미 해석한 원본은 덮어쓰지 않습니다.',409);must(req.body.confirmed==='true','같은 OZD에서 내보낸 엑셀인지 확인해야 합니다.');must(req.file&&/\.xlsx$/i.test(req.file.originalname),'OZ Viewer에서 저장한 XLSX 파일을 선택하세요.');must(!active.has(batch.id),'이 파일의 변환이 진행 중입니다.',409);active.add(batch.id);parsing++;
+  guard(req.user);const batch=loadImport(db,req.user,req.params.id),source=original(batch.id);must(source?.kind==='OZD','OZD 원본에만 변환 엑셀을 연결합니다.',400);checkOriginal(source);must(batch.workbook.conversion?.state!=='READY','이미 해석한 원본은 덮어쓰지 않습니다.',409);must(req.body.confirmed==='true','같은 OZD에서 내보낸 엑셀인지 확인해야 합니다.');must(req.file&&/\.xlsx$/i.test(req.file.originalname),'OZ Viewer에서 저장한 XLSX 파일을 선택하세요.');must(!active.has(batch.id),'이 파일의 변환이 진행 중입니다.',409);active.add(batch.id);parsing++;
   try{await finish(batch.id,req.user,req.file.buffer,{kind:'OZD',method:'MANUAL_EXPORTED_XLSX',derivedName:normalizeUploadName(req.file.originalname),inputHash:source.sha256});res.json(response(batch.id,req.user));}
   finally{parsing--;active.delete(batch.id);}
  });

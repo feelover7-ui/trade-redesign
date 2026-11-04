@@ -1,3 +1,4 @@
+import {importAvailability} from './import-lifecycle.mjs';
 import {z} from 'zod';
 import {parseCatalogName} from './catalog-name.mjs';
 import * as XLSX from 'xlsx';
@@ -10,7 +11,7 @@ import {IMPORT_FIELDS} from './excel-parser.mjs';
 
 const configSchema=z.object({sheet:z.string().min(1).max(100),headerRow:z.number().int().min(1).max(30),mapping:z.record(z.string(),z.number().int().min(0).max(63)),groupIdentical:z.boolean().default(false),department:z.string().trim().max(100).default('')});
 export function storeImport(db,user,name,bytes,workbook){business(user);const id=uid();db.prepare('INSERT INTO import_batches VALUES(?,?,?,?,?,?,?)').run(id,user.org_id,user.id,hash(bytes),name,JSON.stringify({...workbook,images:undefined}),now());audit(db,user,'EXCEL_PREVIEW',id,{fileHash:hash(bytes),name});return id;}
-export function loadImport(db,user,id){business(user);const b=db.prepare('SELECT * FROM import_batches WHERE id=? AND org_id=?').get(id,user.org_id);must(b,'본 기관의 업로드를 찾을 수 없습니다.',404);must(Date.now()-Date.parse(b.created_at)<86400000,'미리보기가 만료되었습니다. 원본 파일을 다시 올리세요.',410);return {...b,orgName:db.prepare('SELECT name FROM organizations WHERE id=?').get(user.org_id)?.name,workbook:JSON.parse(b.workbook)};}
+export function loadImport(db,user,id){business(user);const b=db.prepare('SELECT * FROM import_batches WHERE id=? AND org_id=?').get(id,user.org_id);must(b,'본 기관의 업로드를 찾을 수 없습니다.',404);const workbook=JSON.parse(b.workbook);const availability=importAvailability({createdAt:b.created_at,inputFormat:workbook.inputFormat,conversionState:workbook.conversion?.state,readyAt:workbook.conversion?.readyAt});must(!availability.expired,'미리보기가 만료되었습니다. 원본 파일을 다시 올리세요.',410);return {...b,...availability,orgName:db.prepare('SELECT name FROM organizations WHERE id=?').get(user.org_id)?.name,workbook};}
 export function previewImport(batch,input){
  must(batch.workbook.conversion?.state!=='WAITING','OZD 변환을 완료한 뒤 미리보기와 등록을 진행하세요.',409);
  const config=configSchema.parse(input);const sheet=batch.workbook.sheets.find(s=>s.name===config.sheet);must(sheet,'시트를 확인하세요.');
