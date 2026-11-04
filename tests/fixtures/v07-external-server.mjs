@@ -12,7 +12,7 @@ export function demandWorkbook(){const wb=XLSX.utils.book_new();XLSX.utils.book_
 export async function startExternalTestServer(){
  const dir=mkdtempSync(join(tmpdir(),'trade-v07-browser-')),db=openDatabase(join(dir,'trade.sqlite'));await seedDemo(db,dir);
  let app;const server=createServer((req,res)=>app(req,res));await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;const calls={catalog:0,ozd:0,ai:0};
- const env={PROCUREMENT_ENABLED:'true',DATA_GO_KR_SERVICE_KEY:'SYNTHETIC-NOT-REAL',OZD_BRIDGE_ENABLED:'true',OZD_BRIDGE_APPROVED:'true',OZD_BRIDGE_TOKEN:'SYNTHETIC-BRIDGE-TOKEN-NOT-REAL-32CHARS',OZD_BRIDGE_URL:'http://127.0.0.1:4318/convert',RAG_AI_ENABLED:'true',RAG_EXTERNAL_APPROVED:'true',DEEPSEEK_API_KEY:'SYNTHETIC-NOT-REAL',RAG_MODEL:'deepseek-test-fixture'};
+ const env={PROCUREMENT_ENABLED:'true',DATA_GO_KR_SERVICE_KEY:'SYNTHETIC-NOT-REAL',OZD_LEGACY_BRIDGE_FALLBACK:'true',OZD_BRIDGE_ENABLED:'true',OZD_BRIDGE_APPROVED:'true',OZD_BRIDGE_TOKEN:'SYNTHETIC-BRIDGE-TOKEN-NOT-REAL-32CHARS',OZD_BRIDGE_URL:'http://127.0.0.1:4318/convert',RAG_AI_ENABLED:'true',RAG_EXTERNAL_APPROVED:'true',DEEPSEEK_API_KEY:'SYNTHETIC-NOT-REAL',RAG_MODEL:'deepseek-test-fixture'};
  const fetcher=async(target,options={})=>{const u=new URL(target);
   if(u.hostname==='apis.data.go.kr'){calls.catalog++;return new Response(JSON.stringify({response:{header:{resultCode:'00'},body:{items:[{prdctIdntNo:'00001234',krnPrdctNm:'합성 수납장',mnfctCorpNm:'검증용 제조사',prdctClsfcNoNm:'수납장',useYn:'Y'}]}}}));}
   if(u.pathname==='/convert'){calls.ozd++;return new Response(demandWorkbook(),{headers:{'Content-Type':XLSX_MIME,'X-Source-SHA256':options.headers['X-Source-SHA256']}});}

@@ -1,6 +1,6 @@
 {
   "name": "mulppum-ieum",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -20,7 +20,8 @@
     "preflight": "node --env-file-if-exists=.env scripts/preflight.mjs",
     "rag:check": "node --env-file-if-exists=.env scripts/rag-check.mjs",
     "ozd:bridge": "node --env-file-if-exists=.env.ozd tools/ozd-bridge/server.mjs",
-    "ozd:html5:check": "node --env-file-if-exists=.env.ozd tools/ozd-bridge/check-html5.mjs"
+    "ozd:html5:check": "node --env-file-if-exists=.env.ozd tools/ozd-bridge/check-html5.mjs",
+    "ozd:convert": "node scripts/ozd-convert.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",

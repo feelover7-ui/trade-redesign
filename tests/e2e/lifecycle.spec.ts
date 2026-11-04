@@ -73,7 +73,15 @@ test('등록부터 독립 검토·양 기관 증빙·불일치 보류·대장 �
     for(const [p,steps] of [[reviewer,['inquiry','agreement_sender','approval_sender']],[buyerReviewer,['agreement_receiver','approval_receiver']]] as [Page,string[]][]){
       await p.goto('/'+casePath);await p.locator('.upload-control input[type=file]').setInputFiles(attachment);await toast(p,'첨부파일을 저장');
       await p.getByLabel('우리 기관이 첨부한 증빙').selectOption({label:attachment.name});
-      for(const step of steps){await saveStep(p,step);}
+      for(const step of steps){
+        // An earlier identical toast can remain visible; it is not proof of this save.
+        await p.getByLabel('확인할 단계').selectOption(step);
+        await p.getByLabel('공식 처리번호·확인 근거').fill('합성근거-'+step);
+        const saved=p.waitForResponse(response=>response.url().endsWith('/steps')&&response.request().method()==='POST'&&response.request().postDataJSON()?.step===step);
+        await p.getByRole('button',{name:'확인 근거 저장',exact:true}).click();
+        expect((await saved).status()).toBe(200);
+        await expect(p.locator('.step-list')).toContainText('합성근거-'+step);
+      }
     }
     // Actual CSV file import, preserving leading zeroes, then asset binding.
     await page.goto('/#/inventory');await expect(page.getByRole('heading',{name:'대장 가져오기·자산 연결',exact:true})).toBeVisible();
