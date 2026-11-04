@@ -23,6 +23,29 @@ export function ozdStatus(env=process.env){
  const configured=enabled&&approved&&!!bridgeUrl(env)&&String(env.OZD_BRIDGE_TOKEN||'').length>=32;
  return {configured,mode:configured?'BRIDGE_CONFIGURED':'CONVERTER_REQUIRED',message:configured?'변환 연결 설정됨 · 실제 OZD 변환은 업로드 시 확인합니다.':'OZD 자동 해석은 승인된 OZ 변환기 연결이 필요합니다. 원본을 보관한 뒤 변환 엑셀을 연결할 수도 있습니다.'};
 }
+/** Reports real conversion engine readiness; a configured URL is not a working OZ engine. */
+export async function probeOzdBridge({env=process.env,fetcher=fetch}={}){
+ const base=ozdStatus(env);
+ if(!base.configured)return {...base,ready:false};
+ try{
+  const url=bridgeUrl(env);url.pathname='/health';
+  const response=await fetcher(url,{headers:{Authorization:'Bearer '+env.OZD_BRIDGE_TOKEN,Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(3000)});
+  if(!response.ok){await response.body?.cancel();return {...base,ready:false,message:'OZD 변환기 인증 또는 상태 확인에 실패했습니다. 기존 원본은 보존됩니다.'};}
+  // Health is an untrusted private HTTP response too. Bound bytes before reading
+  // the whole body, and never reflect arbitrary engine text or authentication.
+  if(Number(response.headers.get('content-length'))>2048){await response.body?.cancel();throw Error('health response too large');}
+  const reader=response.body?.getReader();if(!reader)throw Error('empty health response');
+  const chunks=[];let size=0;
+  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>2048){await reader.cancel();throw Error('health response too large');}chunks.push(Buffer.from(value));}}
+  finally{reader.releaseLock();}
+  const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  const knownTypes=new Set(['OZ_HTML5','EXTERNAL_EXECUTABLE','OZ_RUNTIME']);
+  const engineType=data.engineType===undefined?'OZ_RUNTIME':knownTypes.has(data.engineType)?data.engineType:'';
+  const ready=data.ok===true&&data.engineConfigured===true&&!!engineType;
+  return {...base,ready,engineType:ready?engineType:'',message:ready?'OZD 변환 엔진이 연결돼 있습니다. 실제 파일 변환은 업로드 시 검증합니다.':'OZD 브릿지는 응답하지만 OZ Viewer 변환 엔진·라이선스 설정이 완료되지 않았습니다.'};
+ }catch{return {...base,ready:false,message:'OZD 변환기 상태를 확인할 수 없습니다. 원본 보관·변환 대기로 진행합니다.'};}
+}
+
 /** Our private bridge contract, NOT a public OZ/FORCS or procurement API. */
 export async function convertOzd(bytes,{env=process.env,fetcher=fetch}={}){
  assertOzd(bytes);if(!ozdStatus(env).configured)throw fail('OZD 변환기가 아직 연결되지 않았습니다. 원본은 보관하고 변환기 설정 또는 변환 엑셀 연결 후 계속할 수 있습니다.','OZD_CONVERTER_REQUIRED',503);

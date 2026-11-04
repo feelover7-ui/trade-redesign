@@ -6,7 +6,7 @@ import {normalizeUploadName} from './file-names.mjs';
 import {parseWorkbookIsolated} from './excel-parser.mjs';
 import {storeImport,loadImport} from './excel-import.mjs';
 import {saveImportImages,uploadView} from './inventory-tools.mjs';
-import {assertOzd,convertOzd,ozdStatus,sha256,MAX_DOCUMENT_BYTES} from './ozd-converter.mjs';
+import {assertOzd,convertOzd,ozdStatus,probeOzdBridge,sha256,MAX_DOCUMENT_BYTES} from './ozd-converter.mjs';
 
 async function parseTable(bytes){try{return await parseWorkbookIsolated(bytes);}catch{throw Object.assign(new Error('파일에서 물품 표를 읽지 못했습니다. 형식·용량·암호화 여부를 확인하세요.'),{status:400,code:'TABLE_PARSE_FAILED'});}}
 export function mountDocumentImports(app,db,{env=process.env,fetcher=fetch}={}){
@@ -31,7 +31,7 @@ export function mountDocumentImports(app,db,{env=process.env,fetcher=fetch}={}){
   catch(e){const code=e.code?.startsWith('OZD_')?e.code:'OZD_TABLE_INVALID';const message=e.code?.startsWith('OZD_')?e.message:'변환 결과에서 유효한 물품 표를 읽지 못했습니다. 변환 양식을 확인하거나 변환 엑셀을 연결하세요.';pending(id,message,code);audit(db,user,'OZD_CONVERSION_WAITING',id,{code});}
   finally{active.delete(id);}
  }
- app.get('/api/imports/capabilities',(req,res)=>{business(req.user);res.json({extensions:['xlsx','xls','ozd'],maxBytes:MAX_DOCUMENT_BYTES,ozd:ozdStatus(env)});});
+ app.get('/api/imports/capabilities',async(req,res)=>{business(req.user);res.json({extensions:['xlsx','xls','ozd'],maxBytes:MAX_DOCUMENT_BYTES,ozd:await probeOzdBridge({env,fetcher})});});
  app.post('/api/imports/documents',upload.single('file'),async(req,res)=>{
   guard(req.user);must(req.file,'파일을 선택하세요.');const name=normalizeUploadName(req.file.originalname),ext=extname(name).toLowerCase();must(['.xlsx','.xls','.ozd'].includes(ext),'엑셀(XLSX·XLS) 또는 OZD 파일을 선택하세요.');
   if(ext==='.ozd')assertOzd(req.file.buffer);
