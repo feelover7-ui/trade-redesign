@@ -7,7 +7,7 @@ async function login(page:Page,email:string){
   await page.goto('/');await page.getByLabel('이메일',{exact:true}).fill(email);
   await page.getByLabel('비밀번호',{exact:true}).fill('DemoTrade!2026');
   await page.getByRole('button',{name:'기관 계정으로 로그인'}).click();
-  await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'오늘 할 일',exact:true})).toBeVisible();await page.goto('/#/market');await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();
 }
 async function toast(page:Page,text:string){await expect(page.locator('.toast')).toContainText(text);}
 

@@ -3,7 +3,7 @@ import {makeOzd,syntheticRows} from '../fixtures/native-ozd.mjs';
 import {startExternalTestServer} from '../fixtures/v07-external-server.mjs';
 import * as XLSX from 'xlsx';
 import {readFileSync} from 'node:fs';
-async function login(page:Page,url='/'){await page.goto(url);await page.getByLabel('이메일',{exact:true}).fill('staff1@demo.local');await page.getByLabel('비밀번호',{exact:true}).fill('DemoTrade!2026');await page.getByRole('button',{name:'기관 계정으로 로그인'}).click();await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();}
+async function login(page:Page,url='/'){await page.goto(url);await page.getByLabel('이메일',{exact:true}).fill('staff1@demo.local');await page.getByLabel('비밀번호',{exact:true}).fill('DemoTrade!2026');await page.getByRole('button',{name:'기관 계정으로 로그인'}).click();await expect(page.getByRole('heading',{name:'오늘 할 일',exact:true})).toBeVisible();await page.evaluate(()=>{location.hash='#/market';});await expect(page.getByRole('heading',{name:'우리 학교에 필요한 물품을 찾아보세요'})).toBeVisible();}
 async function drop(page:Page,bytes:Buffer){const dt=await page.evaluateHandle(bytes=>{const data=new DataTransfer();data.items.add(new File([new Uint8Array(bytes)],'소요조회_네이티브.ozd',{type:'application/octet-stream'}));return data;},Array.from(bytes));await page.getByTestId('excel-upload-dropzone').dispatchEvent('drop',{dataTransfer:dt});await dt.dispose();}
 test('OZD만 드래그→내부 직접변환→XLSX 다운로드→원본 검증→초안 (외부 엔진 없음)',async({page})=>{
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));await login(page);await page.goto('/#/new');await drop(page,makeOzd());
